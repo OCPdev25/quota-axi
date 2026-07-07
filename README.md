@@ -174,7 +174,7 @@ It is generated from `src/skill.ts`; update it with `pnpm run build:skill` and v
 ```
 
 - **Live first** - direct provider usage calls use 15 second request timeouts, Codex JSON-RPC reads use short per-call timeouts, and stale cache fallback is per provider.
-- **No default Keychain prompt** - macOS Claude Keychain reads are skipped unless `--allow-keychain-prompt` is passed.
+- **No default Keychain prompt** - macOS Claude Keychain value reads are skipped unless `--allow-keychain-prompt` is passed.
 - **Partial success is success** - one provider can fail while another returns fresh or stale data, and the process still exits 0. Exit code 1 means every provider failed, and 2 means a usage error.
 - **No token equivalence** - quota-axi does not claim that one provider percentage equals another provider percentage.
 
@@ -203,10 +203,11 @@ Quota reports contain `providers`, each with `provider`, `label`, `source`, `win
 With `--full`, providers can also include `account` identity and per-source `attempts`.
 Provider `state` includes `status`, `stale`, `sourcesTried`, optional `refreshedAt`, optional `error`, optional `retryAfter`, optional `reason`, and optional `remedyCommand`.
 When stale or unavailable quota is likely fixable by a one-time macOS Keychain grant, `state.reason` is `keychain_access_required`, `state.remedyCommand` is `quota-axi --allow-keychain-prompt`, and JSON includes an agent-directed `help` entry.
+Default TOON output includes the same condition in an `advice` block with `provider`, `reason`, and `remedyCommand`, plus the agent-directed help line.
 Quota windows include `id`, `label`, `kind`, optional percentages, optional reset fields, optional `windowSeconds`, and optional credit-spend fields.
 Account identity and per-source `attempts` are omitted unless `--full` is passed.
 Provider statuses are `fresh`, `stale`, `unavailable`, `auth_required`, `rate_limited`, or `error`.
-Provider sources are `oauth`, `cli-rpc`, `api`, `web`, `cache`, or `unavailable`; v1 emits `oauth`, `cli-rpc`, `cache`, and `unavailable`.
+Provider sources are `oauth`, `cli-rpc`, `api`, `web`, `cache`, or `unavailable`; current provider adapters emit `oauth`, `cli-rpc`, `cache`, and `unavailable`.
 Window kinds are `session`, `weekly`, `monthly`, `model`, `credits`, or `unknown`.
 Source attempts use `success`, `failed`, or `skipped`.
 Source attempts can include `credentialPresent` when a non-secret probe confirms a credential item exists.

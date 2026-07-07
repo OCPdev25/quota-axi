@@ -66,7 +66,8 @@ or when comparing Claude and Codex headroom side by side.
 4. Pass \`--full\` to include account identity and per-source attempt details.
 5. Run \`npx -y quota-axi auth\` to check local auth-source availability without printing
    secret values.
-6. If quota output reports \`reason: keychain_access_required\`, tell your user to run
+6. On macOS, Claude Keychain value reads are skipped by default.
+   If quota output reports \`reason: keychain_access_required\`, tell your user to run
    \`quota-axi --allow-keychain-prompt\` once and approve Keychain access ("Always Allow").
 
 ## Usage

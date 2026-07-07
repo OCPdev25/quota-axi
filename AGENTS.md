@@ -9,9 +9,9 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 - Provider adapter behavior (retry-after handling, snake/camel field tolerance, window parsing) is an original, clean-room implementation derived only from the vendors' own OAuth/HTTP behavior; quota-axi carries no vendored or attributed third-party adapter code.
 - Default stdout is compact TOON.
 - `--json` emits the normalized model, and `--full` is required before account identity or per-source attempts are shown.
-- JSON provider reports include `provider`, `label`, `source`, `windows`, and `state`; `state.retryAfter` can appear for provider rate limits.
-- macOS Claude Keychain reads are skipped by default because they can prompt.
-- `--allow-keychain-prompt` is the only v1 opt-in for that behavior.
+- JSON provider reports include `provider`, `label`, `source`, `windows`, and `state`; `state.retryAfter` can appear for provider rate limits, and `state.reason: keychain_access_required` plus `state.remedyCommand` can appear when a stale or unavailable Claude result is blocked by a skipped macOS Keychain prompt.
+- macOS Claude Keychain value reads are skipped by default because they can prompt; quota-axi may still run a non-secret Keychain item presence check so it only suggests access when a credential item exists.
+- `--allow-keychain-prompt` is the only opt-in that permits reading the Claude Keychain value, and agents should relay the one-time "Always Allow" grant when `keychain_access_required` advice appears.
 - Codex uses `$CODEX_HOME/auth.json` or `~/.codex/auth.json` OAuth before the CLI fallback.
 - Codex `auth.json` support is OAuth-token only; never treat `OPENAI_API_KEY` as valid quota auth or send API keys to ChatGPT quota endpoints.
 - Never launch the Claude CLI to probe quota, because that would spend the quota being measured.
