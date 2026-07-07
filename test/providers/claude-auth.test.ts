@@ -37,7 +37,9 @@ describe("Claude credential-state reporting", () => {
     mkdirSync(join(home, ".claude"), { recursive: true });
     writeFileSync(
       join(home, ".claude", ".credentials.json"),
-      JSON.stringify({ claudeAiOauth: { accessToken: "expired-token", expiresAt: 1 } }),
+      JSON.stringify({
+        claudeAiOauth: { accessToken: "expired-token", expiresAt: 1 },
+      }),
     );
 
     const { fetchQuota } = await import("../../src/providers/claude.js");

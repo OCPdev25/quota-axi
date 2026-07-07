@@ -122,14 +122,14 @@ pnpm run dev
 
 ### Flags
 
-| Flag                        | Description                                                |
-| --------------------------- | ---------------------------------------------------------- |
-| `--provider claude,codex`   | Scope providers                                            |
-| `--json`                    | Emit normalized JSON instead of TOON for quota or auth      |
-| `--full`                    | Include quota account identity and source attempts          |
-| `--allow-keychain-prompt`   | Permit macOS Claude Keychain access that could prompt      |
-| `-h`, `--help`              | Print terse AXI help                                       |
-| `-v`, `-V`, `--version`     | Print version                                              |
+| Flag                      | Description                                            |
+| ------------------------- | ------------------------------------------------------ |
+| `--provider claude,codex` | Scope providers                                        |
+| `--json`                  | Emit normalized JSON instead of TOON for quota or auth |
+| `--full`                  | Include quota account identity and source attempts     |
+| `--allow-keychain-prompt` | Permit macOS Claude Keychain access that could prompt  |
+| `-h`, `--help`            | Print terse AXI help                                   |
+| `-v`, `-V`, `--version`   | Print version                                          |
 
 ## Output Model
 

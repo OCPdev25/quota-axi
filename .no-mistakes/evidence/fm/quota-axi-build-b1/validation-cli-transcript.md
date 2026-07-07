@@ -5,7 +5,6 @@ Each prompt below is the `quota-axi` CLI entrypoint executed from source with `n
 Provider calls are fixture-backed through a Node preload, with fake homes and throwaway cache directories.
 The run did not use personal Claude or Codex credentials, did not allow a Keychain prompt, and did not contact provider services.
 
-
 ## Help output
 
 ```console

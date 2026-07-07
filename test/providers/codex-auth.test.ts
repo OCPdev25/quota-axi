@@ -36,7 +36,10 @@ function authFile(): string {
 }
 
 function writeAuth(value: unknown): void {
-  writeFileSync(authFile(), typeof value === "string" ? value : JSON.stringify(value));
+  writeFileSync(
+    authFile(),
+    typeof value === "string" ? value : JSON.stringify(value),
+  );
 }
 
 function jwt(payload: Record<string, unknown>): string {
@@ -49,7 +52,8 @@ describe("Codex credential-state reporting", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
-    const { fetchQuota, inspectAuth } = await import("../../src/providers/codex.js");
+    const { fetchQuota, inspectAuth } =
+      await import("../../src/providers/codex.js");
     const auth = await inspectAuth({ allowKeychainPrompt: false });
     const result = await fetchQuota({ allowKeychainPrompt: false });
 
@@ -71,7 +75,8 @@ describe("Codex credential-state reporting", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
-    const { fetchQuota, inspectAuth } = await import("../../src/providers/codex.js");
+    const { fetchQuota, inspectAuth } =
+      await import("../../src/providers/codex.js");
     const auth = await inspectAuth({ allowKeychainPrompt: false });
     const result = await fetchQuota({ allowKeychainPrompt: false });
 
@@ -110,7 +115,13 @@ describe("Codex credential-state reporting", () => {
         access_token: jwt({ exp: Math.floor(Date.now() / 1000) + 3600 }),
       },
     });
-    const fetchMock = vi.fn(async () => new Response(null, { status: 429, headers: { "retry-after": retryAfter } }));
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(null, {
+          status: 429,
+          headers: { "retry-after": retryAfter },
+        }),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const { fetchQuota } = await import("../../src/providers/codex.js");

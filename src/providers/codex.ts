@@ -4,7 +4,12 @@ import { spawn } from "node:child_process";
 import { readCachedProvider } from "../cache.js";
 import { readJsonFileResult, type JsonFileReadResult } from "../lib/fs.js";
 import { commandExists, terminateChild } from "../lib/process.js";
-import { clampPercent, nowIso, parseEpochOrIso, retryAfterToIso } from "../lib/time.js";
+import {
+  clampPercent,
+  nowIso,
+  parseEpochOrIso,
+  retryAfterToIso,
+} from "../lib/time.js";
 import type {
   AuthProviderReport,
   AuthSourceReport,
@@ -14,7 +19,14 @@ import type {
   QuotaWindow,
   SourceAttempt,
 } from "../types.js";
-import { failedProvider, sourceNames, staleFromCache, statusFromError, successProvider, withRemaining } from "./common.js";
+import {
+  failedProvider,
+  sourceNames,
+  staleFromCache,
+  statusFromError,
+  successProvider,
+  withRemaining,
+} from "./common.js";
 
 const ENDPOINTS = [
   "https://chatgpt.com/backend-api/wham/usage",
@@ -34,7 +46,10 @@ type AvailableCredentialState = {
   credentials: CodexCredentials;
   source: AuthSourceReport;
 };
-type UnavailableCredentialState = { status: "missing" | "invalid" | "expired"; source: AuthSourceReport };
+type UnavailableCredentialState = {
+  status: "missing" | "invalid" | "expired";
+  source: AuthSourceReport;
+};
 type CredentialState = AvailableCredentialState | UnavailableCredentialState;
 
 type RawWindow = {
@@ -54,7 +69,9 @@ export const codexAdapter: ProviderAdapter = {
   inspectAuth,
 };
 
-export async function fetchQuota(_options: ProviderOptions): Promise<ProviderQuota> {
+export async function fetchQuota(
+  _options: ProviderOptions,
+): Promise<ProviderQuota> {
   const attempts: SourceAttempt[] = [];
   let finalError = "Codex quota unavailable";
   let retryAfter: string | undefined;
@@ -79,12 +96,21 @@ export async function fetchQuota(_options: ProviderOptions): Promise<ProviderQuo
       });
     } catch (error) {
       finalError = errorMessage(error);
-      attempts[attempts.length - 1] = { source: "oauth", status: "failed", error: finalError };
+      attempts[attempts.length - 1] = {
+        source: "oauth",
+        status: "failed",
+        error: finalError,
+      };
       if (error instanceof RateLimitError) retryAfter = error.retryAfter;
     }
   } else {
-    attempts.push({ source: "oauth", status: "skipped", error: `credentials_${credentialState.status}` });
-    if (credentialState.status !== "missing") finalError = "Codex sign-in required";
+    attempts.push({
+      source: "oauth",
+      status: "skipped",
+      error: `credentials_${credentialState.status}`,
+    });
+    if (credentialState.status !== "missing")
+      finalError = "Codex sign-in required";
   }
 
   attempts.push({ source: "cli-rpc", status: "failed" });
@@ -105,8 +131,13 @@ export async function fetchQuota(_options: ProviderOptions): Promise<ProviderQuo
     });
   } catch (error) {
     const message = errorMessage(error);
-    attempts[attempts.length - 1] = { source: "cli-rpc", status: "failed", error: message };
-    finalError = finalError === "Codex quota unavailable" ? message : finalError;
+    attempts[attempts.length - 1] = {
+      source: "cli-rpc",
+      status: "failed",
+      error: message,
+    };
+    finalError =
+      finalError === "Codex quota unavailable" ? message : finalError;
   }
 
   const cached = readCachedProvider("codex");
@@ -125,7 +156,9 @@ export async function fetchQuota(_options: ProviderOptions): Promise<ProviderQuo
   });
 }
 
-export async function inspectAuth(_options: ProviderOptions): Promise<AuthProviderReport> {
+export async function inspectAuth(
+  _options: ProviderOptions,
+): Promise<AuthProviderReport> {
   const authFile = codexAuthFile();
   const credentialState = readCredentialState(authFile);
   return {
@@ -140,9 +173,15 @@ export async function inspectAuth(_options: ProviderOptions): Promise<AuthProvid
   };
 }
 
-export function normalizeCodexUsage(
-  raw: unknown,
-): { plan?: string; account?: ProviderQuota["account"]; windows: QuotaWindow[]; credits?: ProviderQuota["credits"]; refreshedAt: string } | undefined {
+export function normalizeCodexUsage(raw: unknown):
+  | {
+      plan?: string;
+      account?: ProviderQuota["account"];
+      windows: QuotaWindow[];
+      credits?: ProviderQuota["credits"];
+      refreshedAt: string;
+    }
+  | undefined {
   // The response-shape tolerance for snake and camel fields follows the public
   // CodexBar adapter behavior by Peter Steinberger, translated under MIT.
   if (!raw || typeof raw !== "object") return undefined;
@@ -154,8 +193,20 @@ export function normalizeCodexUsage(
     data;
 
   const windows = [
-    normalizeWindow(rateLimit.primary_window ?? rateLimit.primary ?? data.primary_window, "five_hour", "session", "session"),
-    normalizeWindow(rateLimit.secondary_window ?? rateLimit.secondary ?? data.secondary_window, "weekly", "week", "weekly"),
+    normalizeWindow(
+      rateLimit.primary_window ?? rateLimit.primary ?? data.primary_window,
+      "five_hour",
+      "session",
+      "session",
+    ),
+    normalizeWindow(
+      rateLimit.secondary_window ??
+        rateLimit.secondary ??
+        data.secondary_window,
+      "weekly",
+      "week",
+      "weekly",
+    ),
   ].filter((window): window is QuotaWindow => Boolean(window));
 
   if (windows.length === 0) return undefined;
@@ -172,42 +223,82 @@ export function normalizeCodexUsage(
   };
 }
 
-export function mergeAccountAndLimits(account: unknown, limits: unknown): Record<string, unknown> {
+export function mergeAccountAndLimits(
+  account: unknown,
+  limits: unknown,
+): Record<string, unknown> {
   const accountData = objectValue(account) ?? {};
   const accountRecord = objectValue(accountData.account) ?? accountData;
   const limitData = objectValue(limits) ?? {};
   return {
     ...limitData,
     email: accountRecord.email ?? limitData.email,
-    account_id: accountRecord.account_id ?? accountRecord.accountId ?? limitData.account_id,
-    plan_type: accountRecord.plan_type ?? accountRecord.planType ?? limitData.plan_type,
+    account_id:
+      accountRecord.account_id ??
+      accountRecord.accountId ??
+      limitData.account_id,
+    plan_type:
+      accountRecord.plan_type ?? accountRecord.planType ?? limitData.plan_type,
   };
 }
 
 function codexAuthFile(): string {
-  return process.env.CODEX_HOME ? join(process.env.CODEX_HOME, "auth.json") : join(homedir(), ".codex", "auth.json");
+  return process.env.CODEX_HOME
+    ? join(process.env.CODEX_HOME, "auth.json")
+    : join(homedir(), ".codex", "auth.json");
 }
 
 function readCredentialState(authFile = codexAuthFile()): CredentialState {
   return extractCredentialState(readJsonFileResult(authFile), authFile);
 }
 
-function extractCredentialState(raw: JsonFileReadResult, path: string): CredentialState {
-  if (raw.status === "missing") return { status: "missing", source: { source: "auth-json", path, status: "missing" } };
+function extractCredentialState(
+  raw: JsonFileReadResult,
+  path: string,
+): CredentialState {
+  if (raw.status === "missing")
+    return {
+      status: "missing",
+      source: { source: "auth-json", path, status: "missing" },
+    };
   if (raw.status === "invalid")
-    return { status: "invalid", source: { source: "auth-json", path, status: "invalid", error: raw.error } };
+    return {
+      status: "invalid",
+      source: {
+        source: "auth-json",
+        path,
+        status: "invalid",
+        error: raw.error,
+      },
+    };
   const data = objectValue(raw.value);
-  if (!data) return { status: "invalid", source: { source: "auth-json", path, status: "invalid" } };
+  if (!data)
+    return {
+      status: "invalid",
+      source: { source: "auth-json", path, status: "invalid" },
+    };
   const tokens = objectValue(data.tokens);
-  if (!tokens) return { status: "invalid", source: { source: "auth-json", path, status: "invalid" } };
-  const accessToken = stringValue(tokens.access_token) ?? stringValue(tokens.accessToken);
-  if (!accessToken) return { status: "invalid", source: { source: "auth-json", path, status: "invalid" } };
+  if (!tokens)
+    return {
+      status: "invalid",
+      source: { source: "auth-json", path, status: "invalid" },
+    };
+  const accessToken =
+    stringValue(tokens.access_token) ?? stringValue(tokens.accessToken);
+  if (!accessToken)
+    return {
+      status: "invalid",
+      source: { source: "auth-json", path, status: "invalid" },
+    };
 
   const idToken = stringValue(tokens.id_token) ?? stringValue(tokens.idToken);
   const idPayload = decodeJwtPayload(idToken);
   const accessPayload = decodeJwtPayload(accessToken);
   if (isExpiredJwtPayload(idPayload) || isExpiredJwtPayload(accessPayload)) {
-    return { status: "expired", source: { source: "auth-json", path, status: "expired" } };
+    return {
+      status: "expired",
+      source: { source: "auth-json", path, status: "expired" },
+    };
   }
   const decoded = idPayload ?? accessPayload;
   const accountId =
@@ -239,13 +330,20 @@ async function fetchOauthUsage(credentials: CodexCredentials): Promise<{
         authorization: `Bearer ${credentials.accessToken}`,
         accept: "application/json",
       };
-      if (credentials.accountId) headers["ChatGPT-Account-Id"] = credentials.accountId;
-      const response = await fetch(endpoint, { headers, signal: controller.signal });
+      if (credentials.accountId)
+        headers["ChatGPT-Account-Id"] = credentials.accountId;
+      const response = await fetch(endpoint, {
+        headers,
+        signal: controller.signal,
+      });
       if (response.status === 401 || response.status === 403) {
         rejected = true;
         continue;
       }
-      if (response.status === 429) throw new RateLimitError(retryAfterToIso(response.headers.get("retry-after")));
+      if (response.status === 429)
+        throw new RateLimitError(
+          retryAfterToIso(response.headers.get("retry-after")),
+        );
       if (!response.ok) continue;
       const quota = normalizeCodexUsage(await response.json());
       if (quota) return quota;
@@ -268,17 +366,29 @@ async function probeCodexCli(): Promise<{
   credits?: ProviderQuota["credits"];
   refreshedAt: string;
 }> {
-  if (!(await commandExists("codex"))) throw new Error("Codex quota unavailable");
-  const child = spawn("codex", ["-s", "read-only", "-a", "untrusted", "app-server"], {
-    stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, NO_COLOR: "1", TERM: "dumb" },
-  });
+  if (!(await commandExists("codex")))
+    throw new Error("Codex quota unavailable");
+  const child = spawn(
+    "codex",
+    ["-s", "read-only", "-a", "untrusted", "app-server"],
+    {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, NO_COLOR: "1", TERM: "dumb" },
+    },
+  );
 
   let nextId = 1;
   let buffer = "";
   let fatalError: Error | undefined;
   const responses = new Map<number, unknown>();
-  const waiters = new Map<number, { timer: NodeJS.Timeout; resolve: (value: unknown) => void; reject: (error: Error) => void }>();
+  const waiters = new Map<
+    number,
+    {
+      timer: NodeJS.Timeout;
+      resolve: (value: unknown) => void;
+      reject: (error: Error) => void;
+    }
+  >();
 
   const failAll = (error: Error) => {
     if (fatalError) return;
@@ -302,7 +412,12 @@ async function probeCodexCli(): Promise<{
     for (const line of lines) {
       if (!line.trim()) continue;
       try {
-        const message = JSON.parse(line) as { id?: unknown; result?: unknown; params?: unknown; error?: unknown };
+        const message = JSON.parse(line) as {
+          id?: unknown;
+          result?: unknown;
+          params?: unknown;
+          error?: unknown;
+        };
         if (typeof message.id !== "number") continue;
         const value = message.error ?? message.result ?? message.params;
         const waiter = waiters.get(message.id);
@@ -338,12 +453,16 @@ async function probeCodexCli(): Promise<{
 
   try {
     const initId = nextId++;
-    sendRpc(child, initId, "initialize", { clientInfo: { name: "quota-axi", version: "1" } });
+    sendRpc(child, initId, "initialize", {
+      clientInfo: { name: "quota-axi", version: "1" },
+    });
     await waitFor(initId, CLI_TIMEOUT_MS);
 
     const accountId = nextId++;
     sendRpc(child, accountId, "account/read");
-    const account = await waitFor(accountId, RPC_TIMEOUT_MS).catch(() => undefined);
+    const account = await waitFor(accountId, RPC_TIMEOUT_MS).catch(
+      () => undefined,
+    );
 
     const limitsId = nextId++;
     sendRpc(child, limitsId, "account/rateLimits/read");
@@ -366,24 +485,36 @@ function sendRpc(
   child.stdin.write(`${JSON.stringify({ id, method, params })}\n`);
 }
 
-function normalizeWindow(raw: unknown, id: string, label: string, kind: QuotaWindow["kind"]): QuotaWindow | undefined {
+function normalizeWindow(
+  raw: unknown,
+  id: string,
+  label: string,
+  kind: QuotaWindow["kind"],
+): QuotaWindow | undefined {
   const data = objectValue(raw) as RawWindow | undefined;
   if (!data) return undefined;
   const used = numberValue(data.used_percent) ?? numberValue(data.usedPercent);
   if (used === undefined) return undefined;
   const windowSeconds =
     numberValue(data.limit_window_seconds) ??
-    (numberValue(data.windowDurationMins) === undefined ? undefined : numberValue(data.windowDurationMins)! * 60);
+    (numberValue(data.windowDurationMins) === undefined
+      ? undefined
+      : numberValue(data.windowDurationMins)! * 60);
   const resetFromSeconds =
     numberValue(data.reset_after_seconds) === undefined
       ? undefined
-      : new Date(Date.now() + numberValue(data.reset_after_seconds)! * 1000).toISOString();
+      : new Date(
+          Date.now() + numberValue(data.reset_after_seconds)! * 1000,
+        ).toISOString();
   return withRemaining({
     id,
     label,
     kind,
     percentUsed: clampPercent(used),
-    resetsAt: parseEpochOrIso(data.reset_at) ?? parseEpochOrIso(data.resetsAt) ?? resetFromSeconds,
+    resetsAt:
+      parseEpochOrIso(data.reset_at) ??
+      parseEpochOrIso(data.resetsAt) ??
+      resetFromSeconds,
     windowSeconds,
   });
 }
@@ -392,7 +523,8 @@ function normalizeCredits(raw: unknown): ProviderQuota["credits"] | undefined {
   const data = objectValue(raw);
   if (!data) return undefined;
   const balance = numberValue(data.balance);
-  const unlimited = typeof data.unlimited === "boolean" ? data.unlimited : undefined;
+  const unlimited =
+    typeof data.unlimited === "boolean" ? data.unlimited : undefined;
   if (balance === undefined && unlimited === undefined) return undefined;
   return {
     remaining: balance,
@@ -401,26 +533,35 @@ function normalizeCredits(raw: unknown): ProviderQuota["credits"] | undefined {
   };
 }
 
-function decodeJwtPayload(token: string | undefined): Record<string, unknown> | undefined {
+function decodeJwtPayload(
+  token: string | undefined,
+): Record<string, unknown> | undefined {
   if (!token) return undefined;
   const payload = token.split(".")[1];
   if (!payload) return undefined;
   try {
     const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
     const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
-    return JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as Record<string, unknown>;
+    return JSON.parse(Buffer.from(padded, "base64").toString("utf8")) as Record<
+      string,
+      unknown
+    >;
   } catch {
     return undefined;
   }
 }
 
-function isExpiredJwtPayload(payload: Record<string, unknown> | undefined): boolean {
+function isExpiredJwtPayload(
+  payload: Record<string, unknown> | undefined,
+): boolean {
   const exp = numberValue(payload?.exp);
   return exp !== undefined && exp <= Math.floor(Date.now() / 1000);
 }
 
 function objectValue(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : undefined;
 }
 
 function stringValue(value: unknown): string | undefined {
@@ -437,7 +578,8 @@ function numberValue(value: unknown): number | undefined {
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof Error && error.name === "AbortError") return "Codex quota request timed out";
+  if (error instanceof Error && error.name === "AbortError")
+    return "Codex quota request timed out";
   return error instanceof Error ? error.message : "Codex quota unavailable";
 }
 

@@ -1,7 +1,15 @@
-import type { ProviderQuota, ProviderSource, ProviderStatus, QuotaWindow, SourceAttempt } from "../types.js";
+import type {
+  ProviderQuota,
+  ProviderSource,
+  ProviderStatus,
+  QuotaWindow,
+  SourceAttempt,
+} from "../types.js";
 import { percentRemaining } from "../lib/time.js";
 
-export function withRemaining(window: Omit<QuotaWindow, "percentRemaining">): QuotaWindow {
+export function withRemaining(
+  window: Omit<QuotaWindow, "percentRemaining">,
+): QuotaWindow {
   return {
     ...window,
     percentRemaining: percentRemaining(window.percentUsed),
@@ -73,7 +81,11 @@ export function staleFromCache(
 }
 
 export function statusFromError(error: string): ProviderStatus {
-  if (error === "keychain_prompt_required" || /sign-in|required|reauth/i.test(error)) return "auth_required";
+  if (
+    error === "keychain_prompt_required" ||
+    /sign-in|required|reauth/i.test(error)
+  )
+    return "auth_required";
   if (/rate.?limit/i.test(error)) return "rate_limited";
   return "error";
 }

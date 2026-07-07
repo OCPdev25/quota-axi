@@ -9,7 +9,11 @@ export type JsonFileReadResult =
 
 export function collapseHome(path: string): string {
   const home = homedir();
-  return path === home ? "~" : path.startsWith(`${home}/`) ? `~/${path.slice(home.length + 1)}` : path;
+  return path === home
+    ? "~"
+    : path.startsWith(`${home}/`)
+      ? `~/${path.slice(home.length + 1)}`
+      : path;
 }
 
 export function cacheFilePath(): string {
@@ -42,7 +46,10 @@ export function readJsonFileResult(file: string): JsonFileReadResult {
 }
 
 function errorCode(error: unknown): string | undefined {
-  return error && typeof error === "object" && "code" in error && typeof error.code === "string"
+  return error &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof error.code === "string"
     ? error.code
     : undefined;
 }

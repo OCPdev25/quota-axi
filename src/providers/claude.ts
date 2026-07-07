@@ -13,7 +13,14 @@ import type {
   QuotaWindow,
   SourceAttempt,
 } from "../types.js";
-import { failedProvider, sourceNames, staleFromCache, statusFromError, successProvider, withRemaining } from "./common.js";
+import {
+  failedProvider,
+  sourceNames,
+  staleFromCache,
+  statusFromError,
+  successProvider,
+  withRemaining,
+} from "./common.js";
 
 const API_URL = "https://api.anthropic.com/api/oauth/usage";
 const OAUTH_BETA = "oauth-2025-04-20";
@@ -30,10 +37,19 @@ type ClaudeCredentials = {
   expiresAt?: number;
 };
 
-type AvailableCredentialState = { status: "available"; credentials: ClaudeCredentials };
-type UnavailableCredentialState = { status: "missing" | "invalid" | "expired"; source: AuthSourceReport };
+type AvailableCredentialState = {
+  status: "available";
+  credentials: ClaudeCredentials;
+};
+type UnavailableCredentialState = {
+  status: "missing" | "invalid" | "expired";
+  source: AuthSourceReport;
+};
 type SkippedCredentialState = { status: "skipped"; source: AuthSourceReport };
-type CredentialState = AvailableCredentialState | UnavailableCredentialState | SkippedCredentialState;
+type CredentialState =
+  | AvailableCredentialState
+  | UnavailableCredentialState
+  | SkippedCredentialState;
 
 type RawUsageWindow = {
   utilization?: unknown;
@@ -54,14 +70,19 @@ export const claudeAdapter: ProviderAdapter = {
   inspectAuth,
 };
 
-export async function fetchQuota(options: ProviderOptions): Promise<ProviderQuota> {
+export async function fetchQuota(
+  options: ProviderOptions,
+): Promise<ProviderQuota> {
   const attempts: SourceAttempt[] = [];
   let finalError = "Claude quota unavailable";
   let retryAfter: string | undefined;
 
   const credentialStates = await readCredentialStates(options);
   const credentials = credentialStates
-    .filter((state): state is AvailableCredentialState => state.status === "available")
+    .filter(
+      (state): state is AvailableCredentialState =>
+        state.status === "available",
+    )
     .map((state) => state.credentials)
     .sort((a, b) => {
       if (process.platform === "darwin") {
@@ -74,11 +95,20 @@ export async function fetchQuota(options: ProviderOptions): Promise<ProviderQuot
   for (const state of credentialStates) {
     if (state.status === "available") continue;
     if (state.status === "skipped") {
-      attempts.push({ source: state.source.source, status: "skipped", error: state.source.error });
-      if (finalError === "Claude quota unavailable") finalError = state.source.error ?? finalError;
+      attempts.push({
+        source: state.source.source,
+        status: "skipped",
+        error: state.source.error,
+      });
+      if (finalError === "Claude quota unavailable")
+        finalError = state.source.error ?? finalError;
       continue;
     }
-    attempts.push({ source: state.source.source, status: "skipped", error: `credentials_${state.status}` });
+    attempts.push({
+      source: state.source.source,
+      status: "skipped",
+      error: `credentials_${state.status}`,
+    });
     finalError = "Claude sign-in required";
   }
 
@@ -101,7 +131,11 @@ export async function fetchQuota(options: ProviderOptions): Promise<ProviderQuot
         });
       } catch (error) {
         const message = errorMessage(error);
-        attempts[attempts.length - 1] = { source: "oauth", status: "failed", error: message };
+        attempts[attempts.length - 1] = {
+          source: "oauth",
+          status: "failed",
+          error: message,
+        };
         finalError = message;
         if (error instanceof RateLimitError) retryAfter = error.retryAfter;
         if (message === "Claude sign-in required") {
@@ -127,13 +161,18 @@ export async function fetchQuota(options: ProviderOptions): Promise<ProviderQuot
   });
 }
 
-export async function inspectAuth(options: ProviderOptions): Promise<AuthProviderReport> {
+export async function inspectAuth(
+  options: ProviderOptions,
+): Promise<AuthProviderReport> {
   const states = await readCredentialStates(options);
   const sources = states.map((state): AuthSourceReport => {
     if (state.status === "available") {
       return {
         source: state.credentials.source,
-        path: state.credentials.source === "oauth-file" ? CREDENTIAL_FILE : undefined,
+        path:
+          state.credentials.source === "oauth-file"
+            ? CREDENTIAL_FILE
+            : undefined,
         status: "available",
       };
     }
@@ -142,23 +181,37 @@ export async function inspectAuth(options: ProviderOptions): Promise<AuthProvide
   return { provider: "claude", sources };
 }
 
-export function normalizeClaudeApiUsage(raw: unknown, plan?: string): { plan?: string; windows: QuotaWindow[]; refreshedAt: string } | undefined {
+export function normalizeClaudeApiUsage(
+  raw: unknown,
+  plan?: string,
+): { plan?: string; windows: QuotaWindow[]; refreshedAt: string } | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const data = raw as Record<string, unknown>;
   const windows = [
     normalizeWindow(data.five_hour, "five_hour", "session", "session"),
     normalizeWindow(data.seven_day, "seven_day", "week", "weekly"),
-    normalizeWindow(data.seven_day_opus, "seven_day_opus", "opus week", "model"),
+    normalizeWindow(
+      data.seven_day_opus,
+      "seven_day_opus",
+      "opus week",
+      "model",
+    ),
     normalizeExtraUsage(data.extra_usage),
   ].filter((window): window is QuotaWindow => Boolean(window));
   if (windows.length === 0) return undefined;
   return { plan, windows, refreshedAt: nowIso() };
 }
 
-async function readCredentialStates(options: ProviderOptions): Promise<CredentialState[]> {
+async function readCredentialStates(
+  options: ProviderOptions,
+): Promise<CredentialState[]> {
   const states: CredentialState[] = [];
 
-  const fileState = extractCredentialState(readJsonFileResult(CREDENTIAL_FILE), "oauth-file", CREDENTIAL_FILE);
+  const fileState = extractCredentialState(
+    readJsonFileResult(CREDENTIAL_FILE),
+    "oauth-file",
+    CREDENTIAL_FILE,
+  );
   states.push(fileState);
 
   if (process.platform === "darwin") {
@@ -191,26 +244,51 @@ async function readKeychainCredentialState(): Promise<CredentialState> {
     return keychainFailureState(error);
   }
   try {
-    return extractCredentialState({ status: "success", value: JSON.parse(blob) }, "keychain");
+    return extractCredentialState(
+      { status: "success", value: JSON.parse(blob) },
+      "keychain",
+    );
   } catch {
-    return { status: "invalid", source: { source: "keychain", status: "invalid", error: "json_parse_error" } };
+    return {
+      status: "invalid",
+      source: {
+        source: "keychain",
+        status: "invalid",
+        error: "json_parse_error",
+      },
+    };
   }
 }
 
 function keychainFailureState(error: unknown): CredentialState {
-  const failure = error as { killed?: boolean; signal?: string | null; code?: number | string | null };
+  const failure = error as {
+    killed?: boolean;
+    signal?: string | null;
+    code?: number | string | null;
+  };
   if (failure.killed || failure.signal) {
     return {
       status: "skipped",
-      source: { source: "keychain", status: "skipped", error: "keychain_prompt_timeout" },
+      source: {
+        source: "keychain",
+        status: "skipped",
+        error: "keychain_prompt_timeout",
+      },
     };
   }
   if (failure.code === KEYCHAIN_ITEM_NOT_FOUND_EXIT_CODE) {
-    return { status: "missing", source: { source: "keychain", status: "missing" } };
+    return {
+      status: "missing",
+      source: { source: "keychain", status: "missing" },
+    };
   }
   return {
     status: "skipped",
-    source: { source: "keychain", status: "skipped", error: "keychain_access_denied" },
+    source: {
+      source: "keychain",
+      status: "skipped",
+      error: "keychain_access_denied",
+    },
   };
 }
 
@@ -219,21 +297,34 @@ function extractCredentialState(
   source: ClaudeCredentials["source"],
   path?: string,
 ): CredentialState {
-  if (raw.status === "missing") return { status: "missing", source: { source, path, status: "missing" } };
+  if (raw.status === "missing")
+    return { status: "missing", source: { source, path, status: "missing" } };
   if (raw.status === "invalid")
-    return { status: "invalid", source: { source, path, status: "invalid", error: raw.error } };
+    return {
+      status: "invalid",
+      source: { source, path, status: "invalid", error: raw.error },
+    };
   const data = objectValue(raw.value);
-  if (!data) return { status: "invalid", source: { source, path, status: "invalid" } };
+  if (!data)
+    return { status: "invalid", source: { source, path, status: "invalid" } };
   const oauth =
     data.claudeAiOauth && typeof data.claudeAiOauth === "object"
       ? (data.claudeAiOauth as Record<string, unknown>)
       : data;
-  const accessToken = stringValue(oauth.accessToken) ?? stringValue(oauth.access_token);
-  if (!accessToken) return { status: "invalid", source: { source, path, status: "invalid" } };
-  const expiresAt = typeof oauth.expiresAt === "number" ? oauth.expiresAt : undefined;
-  if (expiresAt && expiresAt <= Date.now()) return { status: "expired", source: { source, path, status: "expired" } };
-  const plan = stringValue(oauth.subscriptionType) ?? stringValue(data.subscriptionType);
-  return { status: "available", credentials: { source, accessToken, plan, expiresAt } };
+  const accessToken =
+    stringValue(oauth.accessToken) ?? stringValue(oauth.access_token);
+  if (!accessToken)
+    return { status: "invalid", source: { source, path, status: "invalid" } };
+  const expiresAt =
+    typeof oauth.expiresAt === "number" ? oauth.expiresAt : undefined;
+  if (expiresAt && expiresAt <= Date.now())
+    return { status: "expired", source: { source, path, status: "expired" } };
+  const plan =
+    stringValue(oauth.subscriptionType) ?? stringValue(data.subscriptionType);
+  return {
+    status: "available",
+    credentials: { source, accessToken, plan, expiresAt },
+  };
 }
 
 async function fetchOauthUsage(credentials: ClaudeCredentials): Promise<{
@@ -255,10 +346,18 @@ async function fetchOauthUsage(credentials: ClaudeCredentials): Promise<{
       },
       signal: controller.signal,
     });
-    if (response.status === 401 || response.status === 403) throw new Error("Claude sign-in required");
-    if (response.status === 429) throw new RateLimitError(retryAfterToIso(response.headers.get("retry-after")));
-    if (!response.ok) throw new Error(`Claude quota unavailable (${response.status})`);
-    const quota = normalizeClaudeApiUsage(await response.json(), credentials.plan);
+    if (response.status === 401 || response.status === 403)
+      throw new Error("Claude sign-in required");
+    if (response.status === 429)
+      throw new RateLimitError(
+        retryAfterToIso(response.headers.get("retry-after")),
+      );
+    if (!response.ok)
+      throw new Error(`Claude quota unavailable (${response.status})`);
+    const quota = normalizeClaudeApiUsage(
+      await response.json(),
+      credentials.plan,
+    );
     if (!quota) throw new Error("Claude quota unavailable");
     return quota;
   } finally {
@@ -266,10 +365,16 @@ async function fetchOauthUsage(credentials: ClaudeCredentials): Promise<{
   }
 }
 
-function normalizeWindow(raw: unknown, id: string, label: string, kind: QuotaWindow["kind"]): QuotaWindow | undefined {
+function normalizeWindow(
+  raw: unknown,
+  id: string,
+  label: string,
+  kind: QuotaWindow["kind"],
+): QuotaWindow | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const data = raw as RawUsageWindow;
-  const used = typeof data.utilization === "number" ? data.utilization : undefined;
+  const used =
+    typeof data.utilization === "number" ? data.utilization : undefined;
   if (used === undefined) return undefined;
   return withRemaining({
     id,
@@ -284,8 +389,12 @@ function normalizeExtraUsage(raw: unknown): QuotaWindow | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const data = raw as ExtraUsageWindow;
   if (data.is_enabled !== true) return undefined;
-  const spentUsd = typeof data.used_credits === "number" ? data.used_credits / 100 : undefined;
-  const limitUsd = typeof data.monthly_limit === "number" ? data.monthly_limit / 100 : undefined;
+  const spentUsd =
+    typeof data.used_credits === "number" ? data.used_credits / 100 : undefined;
+  const limitUsd =
+    typeof data.monthly_limit === "number"
+      ? data.monthly_limit / 100
+      : undefined;
   const percentUsed =
     typeof data.utilization === "number"
       ? clampPercent(data.utilization)
@@ -303,7 +412,9 @@ function normalizeExtraUsage(raw: unknown): QuotaWindow | undefined {
 }
 
 function objectValue(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : undefined;
 }
 
 function stringValue(value: unknown): string | undefined {
@@ -311,7 +422,8 @@ function stringValue(value: unknown): string | undefined {
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof Error && error.name === "AbortError") return "Claude quota request timed out";
+  if (error instanceof Error && error.name === "AbortError")
+    return "Claude quota request timed out";
   return error instanceof Error ? error.message : "Claude quota unavailable";
 }
 

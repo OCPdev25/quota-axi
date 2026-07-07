@@ -1,12 +1,21 @@
 import { encode } from "@toon-format/toon";
 import { collapseHome } from "./lib/fs.js";
-import type { AuthProviderReport, ProviderQuota, QuotaAxiResponse, SourceAttempt } from "./types.js";
+import type {
+  AuthProviderReport,
+  ProviderQuota,
+  QuotaAxiResponse,
+  SourceAttempt,
+} from "./types.js";
 
 export function renderHelp(lines: string[]): string {
   return `help[${lines.length}]:\n${lines.map((line) => `  ${line}`).join("\n")}`;
 }
 
-export function renderQuotaToon(response: QuotaAxiResponse, binPath: string, full: boolean): string {
+export function renderQuotaToon(
+  response: QuotaAxiResponse,
+  binPath: string,
+  full: boolean,
+): string {
   const providers = response.providers.map((provider) => ({
     provider: provider.provider,
     plan: provider.plan ?? "unknown",
@@ -27,7 +36,8 @@ export function renderQuotaToon(response: QuotaAxiResponse, binPath: string, ful
   const blocks = [
     encode({
       bin: collapseHome(binPath),
-      description: "Report local agent-provider quota windows for routing-aware agents",
+      description:
+        "Report local agent-provider quota windows for routing-aware agents",
       generatedAt: response.generatedAt,
     }),
     encode({ providers }),
@@ -58,7 +68,10 @@ export function renderQuotaToon(response: QuotaAxiResponse, binPath: string, ful
   return blocks.filter(Boolean).join("\n");
 }
 
-export function renderAuthToon(reports: AuthProviderReport[], binPath: string): string {
+export function renderAuthToon(
+  reports: AuthProviderReport[],
+  binPath: string,
+): string {
   const sources = reports.flatMap((report) =>
     report.sources.map((source) => ({
       provider: report.provider,
@@ -71,20 +84,30 @@ export function renderAuthToon(reports: AuthProviderReport[], binPath: string): 
   return [
     encode({
       bin: collapseHome(binPath),
-      description: "Inspect local quota auth sources without printing secret values",
+      description:
+        "Inspect local quota auth sources without printing secret values",
     }),
     encode({ auth: sources }),
-    renderHelp(["Run `quota-axi --allow-keychain-prompt auth` to permit macOS Keychain access"]),
+    renderHelp([
+      "Run `quota-axi --allow-keychain-prompt auth` to permit macOS Keychain access",
+    ]),
   ].join("\n");
 }
 
-export function renderError(message: string, code = "error", help: string[] = []): string {
+export function renderError(
+  message: string,
+  code = "error",
+  help: string[] = [],
+): string {
   const blocks = [encode({ error: message, code })];
   if (help.length > 0) blocks.push(renderHelp(help));
   return blocks.join("\n");
 }
 
-export function redactedResponse(response: QuotaAxiResponse, full: boolean): QuotaAxiResponse {
+export function redactedResponse(
+  response: QuotaAxiResponse,
+  full: boolean,
+): QuotaAxiResponse {
   if (full) return response;
   return {
     ...response,

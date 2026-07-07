@@ -13,7 +13,9 @@ export function parseProviders(value: string | undefined): ProviderId[] {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
-  const invalid = providers.find((provider) => provider !== "claude" && provider !== "codex");
+  const invalid = providers.find(
+    (provider) => provider !== "claude" && provider !== "codex",
+  );
   if (invalid) {
     throw new Error(`unsupported provider: ${invalid}`);
   }

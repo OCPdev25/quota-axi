@@ -7,7 +7,9 @@ export function clampPercent(value: number): number {
   return Math.min(100, Math.max(0, Math.round(value)));
 }
 
-export function percentRemaining(percentUsed: number | undefined): number | undefined {
+export function percentRemaining(
+  percentUsed: number | undefined,
+): number | undefined {
   if (percentUsed === undefined) return undefined;
   return clampPercent(100 - percentUsed);
 }
@@ -26,7 +28,10 @@ export function parseEpochOrIso(value: unknown): string | undefined {
   return undefined;
 }
 
-export function retryAfterToIso(value: string | null, now = Date.now()): string | undefined {
+export function retryAfterToIso(
+  value: string | null,
+  now = Date.now(),
+): string | undefined {
   const raw = value?.trim();
   if (!raw) return undefined;
   const seconds = Number(raw);
