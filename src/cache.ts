@@ -41,20 +41,7 @@ const WINDOW_KINDS = [
 export function readCachedProvider(
   provider: ProviderId,
 ): ProviderQuota | undefined {
-  const cached = readCacheProviders().find(
-    (item) => item.provider === provider,
-  );
-  if (!cached) return undefined;
-  return {
-    ...cached,
-    source: "cache",
-    state: {
-      ...cached.state,
-      status: "stale",
-      stale: true,
-      sourcesTried: [...new Set([...cached.state.sourcesTried, "cache"])],
-    },
-  };
+  return readCacheProviders().find((item) => item.provider === provider);
 }
 
 export function writeCachedProviders(providers: ProviderQuota[]): void {

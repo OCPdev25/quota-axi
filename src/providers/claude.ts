@@ -127,7 +127,7 @@ export async function fetchQuota(options: ProviderOptions): Promise<ProviderQuot
   } catch (error) {
     const message = errorMessage(error);
     attempts[attempts.length - 1] = { source: "cli-pty", status: "failed", error: message };
-    finalError = finalError === "keychain_prompt_required" ? finalError : message;
+    finalError = finalError === "Claude quota unavailable" ? message : finalError;
   }
 
   const cached = readCachedProvider("claude");
@@ -316,7 +316,7 @@ async function probeClaudeCli(): Promise<{
     ["--allowed-tools", ""],
     (stdin) => {
       stdin.write("/usage\n");
-      setTimeout(() => stdin.write("\n"), 1_500);
+      stdin.writeAfter(1_500, "\n");
     },
     CLI_TIMEOUT_MS,
     (buffer) => /Current\s+(session|week)|usage/i.test(stripAnsi(buffer)),

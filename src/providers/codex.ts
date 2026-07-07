@@ -213,6 +213,7 @@ async function fetchOauthUsage(credentials: CodexCredentials): Promise<{
   refreshedAt: string;
 }> {
   let rejected = false;
+  let lastError: unknown;
   for (const endpoint of ENDPOINTS) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
@@ -230,11 +231,15 @@ async function fetchOauthUsage(credentials: CodexCredentials): Promise<{
       if (!response.ok) continue;
       const quota = normalizeCodexUsage(await response.json());
       if (quota) return quota;
+    } catch (error) {
+      lastError = error;
     } finally {
       clearTimeout(timer);
     }
   }
-  throw new Error(rejected ? "Codex sign-in required" : "Codex quota unavailable");
+  if (rejected) throw new Error("Codex sign-in required");
+  if (lastError) throw lastError;
+  throw new Error("Codex quota unavailable");
 }
 
 async function probeCodexCli(): Promise<{
@@ -252,8 +257,24 @@ async function probeCodexCli(): Promise<{
 
   let nextId = 1;
   let buffer = "";
+  let fatalError: Error | undefined;
   const responses = new Map<number, unknown>();
-  const waiters = new Map<number, (value: unknown) => void>();
+  const waiters = new Map<number, { timer: NodeJS.Timeout; resolve: (value: unknown) => void; reject: (error: Error) => void }>();
+
+  const failAll = (error: Error) => {
+    if (fatalError) return;
+    fatalError = error;
+    for (const waiter of waiters.values()) {
+      clearTimeout(waiter.timer);
+      waiter.reject(error);
+    }
+    waiters.clear();
+  };
+
+  child.stdin.on("error", () => {});
+  child.stderr.resume();
+  child.on("error", () => failAll(new Error("Codex quota unavailable")));
+  child.on("close", () => failAll(new Error("Codex quota unavailable")));
 
   child.stdout.on("data", (chunk) => {
     buffer += String(chunk);
@@ -268,7 +289,8 @@ async function probeCodexCli(): Promise<{
         const waiter = waiters.get(message.id);
         if (waiter) {
           waiters.delete(message.id);
-          waiter(value);
+          clearTimeout(waiter.timer);
+          waiter.resolve(value);
         } else {
           responses.set(message.id, value);
         }
@@ -284,14 +306,15 @@ async function probeCodexCli(): Promise<{
         resolve(responses.get(id));
         return;
       }
+      if (fatalError) {
+        reject(fatalError);
+        return;
+      }
       const timer = setTimeout(() => {
         waiters.delete(id);
         reject(new Error("Codex quota unavailable"));
       }, timeoutMs);
-      waiters.set(id, (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      });
+      waiters.set(id, { timer, resolve, reject });
     });
 
   try {
@@ -314,7 +337,13 @@ async function probeCodexCli(): Promise<{
   }
 }
 
-function sendRpc(child: { stdin: { write: (chunk: string) => unknown } }, id: number, method: string, params: unknown = {}) {
+function sendRpc(
+  child: { stdin: { writable: boolean; write: (chunk: string) => unknown } },
+  id: number,
+  method: string,
+  params: unknown = {},
+) {
+  if (!child.stdin.writable) return;
   child.stdin.write(`${JSON.stringify({ id, method, params })}\n`);
 }
 

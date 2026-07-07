@@ -75,10 +75,15 @@ async function isExecutableFile(file: string): Promise<boolean> {
   }
 }
 
+export type SessionStdin = {
+  write: (chunk: string) => void;
+  writeAfter: (delayMs: number, chunk: string) => void;
+};
+
 export function spawnTextSession(
   command: string,
   args: string[],
-  input: (stdin: NodeJS.WritableStream) => void,
+  input: (stdin: SessionStdin) => void,
   timeoutMs: number,
   ready: (buffer: string) => boolean,
 ): Promise<string> {
@@ -89,10 +94,12 @@ export function spawnTextSession(
     });
     let settled = false;
     let buffer = "";
+    const pendingTimers: NodeJS.Timeout[] = [];
     const finish = (error?: Error) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      for (const pending of pendingTimers) clearTimeout(pending);
       child.kill("SIGTERM");
       if (error) reject(error);
       else resolve(buffer);
@@ -101,18 +108,27 @@ export function spawnTextSession(
       () => finish(new Error("command timed out")),
       timeoutMs,
     );
+    const write = (chunk: string) => {
+      if (!settled && child.stdin.writable) child.stdin.write(chunk);
+    };
 
     child.stdout.on("data", (chunk) => {
       buffer += String(chunk);
       if (ready(buffer)) {
-        setTimeout(() => finish(), 300);
+        pendingTimers.push(setTimeout(() => finish(), 300));
       }
     });
     child.stderr.on("data", (chunk) => {
       buffer += String(chunk);
     });
+    child.stdin.on("error", () => {});
     child.on("error", () => finish(new Error("command unavailable")));
     child.on("exit", () => finish());
-    input(child.stdin);
+    input({
+      write,
+      writeAfter: (delayMs, chunk) => {
+        pendingTimers.push(setTimeout(() => write(chunk), delayMs));
+      },
+    });
   });
 }

@@ -1,4 +1,4 @@
-import { constants, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -22,15 +22,5 @@ export function readJsonFile(file: string): unknown | undefined {
     return JSON.parse(readFileSync(file, "utf8"));
   } catch {
     return undefined;
-  }
-}
-
-export function isReadableFile(file: string): boolean {
-  try {
-    constants.R_OK;
-    readFileSync(file, { encoding: "utf8" });
-    return true;
-  } catch {
-    return false;
   }
 }
