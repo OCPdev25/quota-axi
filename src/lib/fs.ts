@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
 
 export type JsonFileReadResult =
   | { status: "success"; value: unknown }
@@ -9,11 +9,38 @@ export type JsonFileReadResult =
 
 export function collapseHome(path: string): string {
   const home = homedir();
-  return path === home
-    ? "~"
-    : path.startsWith(`${home}/`)
-      ? `~/${path.slice(home.length + 1)}`
-      : path;
+  if (path === home) return "~";
+  if (!isAbsolute(path) && !startsWithHomePrefix(path, home)) return path;
+  const relativePath = relative(home, path);
+  if (relativePath === "") return "~";
+  if (isHomeRelativePath(relativePath))
+    return `~/${normalizeRelativePath(relativePath)}`;
+  if (startsWithHomePrefix(path, home))
+    return `~/${path.slice(home.length + 1).replace(/\\/g, "/")}`;
+  return path;
+}
+
+function isHomeRelativePath(path: string): boolean {
+  return path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path);
+}
+
+function normalizeRelativePath(path: string): string {
+  return sep === "\\" ? path.replace(/\\/g, "/") : path;
+}
+
+function startsWithHomePrefix(path: string, home: string): boolean {
+  const separator = path[home.length];
+  return (
+    separator !== undefined &&
+    (separator === "/" || separator === "\\") &&
+    samePath(path.slice(0, home.length), home)
+  );
+}
+
+function samePath(left: string, right: string): boolean {
+  if (process.platform === "win32")
+    return left.toLowerCase() === right.toLowerCase();
+  return left === right;
 }
 
 export function cacheFilePath(): string {

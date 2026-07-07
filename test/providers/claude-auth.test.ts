@@ -92,6 +92,41 @@ describe("Claude credential-state reporting", () => {
     });
   });
 
+  it("sends the Claude Code User-Agent when probing usage", async () => {
+    const home = useTempHome();
+    mkdirSync(join(home, ".claude"), { recursive: true });
+    writeFileSync(
+      join(home, ".claude", ".credentials.json"),
+      JSON.stringify({
+        claudeAiOauth: {
+          accessToken: "fresh-token",
+          expiresAt: "2035-01-01T00:00:00.000Z",
+        },
+      }),
+    );
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ five_hour: { utilization: 12 } }), {
+          status: 200,
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { fetchQuota } = await import("../../src/providers/claude.js");
+    const result = await fetchQuota({ allowKeychainPrompt: false });
+
+    expect(result.state.status).toBe("fresh");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.anthropic.com/api/oauth/usage",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "User-Agent": expect.stringMatching(/^claude-code\/\d+\.\d+\.\d+/),
+          "Content-Type": "application/json",
+        }),
+      }),
+    );
+  });
+
   it("surfaces missing file credentials as a skipped attempt and auth_required", async () => {
     useTempHome();
 

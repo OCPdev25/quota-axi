@@ -24,6 +24,7 @@ import {
 
 const API_URL = "https://api.anthropic.com/api/oauth/usage";
 const OAUTH_BETA = "oauth-2025-04-20";
+const CLAUDE_CODE_USER_AGENT = "claude-code/2.1.202";
 const API_TIMEOUT_MS = 15_000;
 const KEYCHAIN_PROMPT_TIMEOUT_MS = 60_000;
 const KEYCHAIN_ITEM_NOT_FOUND_EXIT_CODE = 44;
@@ -341,6 +342,8 @@ async function fetchOauthUsage(credentials: ClaudeCredentials): Promise<{
       headers: {
         authorization: `Bearer ${credentials.accessToken}`,
         "anthropic-beta": OAUTH_BETA,
+        "User-Agent": CLAUDE_CODE_USER_AGENT,
+        "Content-Type": "application/json",
         accept: "application/json",
       },
       signal: controller.signal,
