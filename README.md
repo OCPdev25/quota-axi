@@ -1,5 +1,7 @@
 <h1 align="center">quota-axi</h1>
 
+<h3 align="center">Your agent needs to be aware of your quota</h3>
+
 <p align="center">
   <a href="https://www.npmjs.com/package/quota-axi"><img alt="npm" src="https://img.shields.io/npm/v/quota-axi?style=flat-square" /></a>
   <a href="https://github.com/kunchenguid/quota-axi/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/kunchenguid/quota-axi/ci.yml?style=flat-square&label=ci" /></a>
@@ -8,17 +10,17 @@
   <a href="https://discord.gg/Wsy2NpnZDu"><img alt="Discord" src="https://img.shields.io/discord/1439901831038763092?style=flat-square&label=discord" /></a>
 </p>
 
-<h3 align="center">Know your local agent quota headroom without turning it into routing advice.</h3>
+Quota CLI for agents - designed with [AXI](https://axi.md) (Agent eXperience Interface).
 
 Agents need quota state before they choose where work can safely run.
 Vendor dashboards are not shaped for shell automation, and local CLIs expose different windows, resets, and auth files.
 
-quota-axi reports local Claude and Codex quota windows in one AXI-shaped call.
+quota-axi reports local Claude and Codex quota windows in one [AXI](https://axi.md)-shaped call.
 It is data only: it never routes, recommends, proxies, intercepts, logs in, imports browser cookies, or mutates provider state.
 
-- **Honest comparison ceiling** - quota-axi reports normalized quota windows, reset times, and provider credit balances when available.
-- **Local first** - it reads local Claude and Codex auth sources, calls first-party provider endpoints, and can fall back to a read-only Codex app-server probe.
-- **Agent shaped** - default stdout is compact TOON, with JSON available for callers that need the normalized model.
+- **Official sources** - quota-axi reads local Claude and Codex auth files and calls the same first-party usage endpoints the vendor CLIs use, with a read-only Codex app-server probe as fallback.
+- **Local first** - everything runs on the machine that holds the credentials; the only network calls are to Anthropic's and OpenAI's own usage endpoints, never a third-party relay.
+- **Token efficient** - default stdout is compact TOON so agents spend fewer tokens parsing quota state, with `--json` available when a caller needs the normalized model.
 
 ## Quick Start
 
@@ -26,21 +28,64 @@ It is data only: it never routes, recommends, proxies, intercepts, logs in, impo
 $ npx -y quota-axi
 bin: ~/.npm/_npx/.../quota-axi
 description: Report local agent-provider quota windows for routing-aware agents
-generatedAt: "2026-07-06T18:10:00.000Z"
+generatedAt: "2026-03-15T16:42:00.000Z"
 providers[2]{provider,plan,source,status,refreshedAt}:
-  claude,pro,oauth,fresh,"2026-07-06T18:09:55.000Z"
-  codex,plus,cli-rpc,fresh,"2026-07-06T18:09:58.000Z"
-windows[6]{provider,id,label,percentRemaining,resetsAt,state}:
-  claude,five_hour,session,82,"2026-07-06T22:15:00.000Z",fresh
-  claude,seven_day,week,64,"2026-07-10T16:00:00.000Z",fresh
-  claude,seven_day_opus,opus week,93,"2026-07-11T09:30:00.000Z",fresh
-  claude,extra_usage,extra usage,75,unknown,fresh
-  codex,five_hour,session,71,"2026-07-06T21:45:00.000Z",fresh
-  codex,weekly,week,43,"2026-07-11T09:00:00.000Z",fresh
+  claude,pro,oauth,fresh,"2026-03-15T16:41:55.000Z"
+  codex,plus,cli-rpc,fresh,"2026-03-15T16:41:58.000Z"
+windows[7]{provider,id,label,percentRemaining,resetsAt,state}:
+  claude,five_hour,session,82,"2026-03-15T21:15:00.000Z",fresh
+  claude,seven_day,week,64,"2026-03-19T15:00:00.000Z",fresh
+  claude,seven_day_opus,opus week,93,"2026-03-20T09:30:00.000Z",fresh
+  claude,"model:fable",Fable week,71,"2026-03-20T09:30:00.000Z",fresh
+  codex,five_hour,session,58,"2026-03-15T20:45:00.000Z",fresh
+  codex,weekly,week,47,"2026-03-19T09:00:00.000Z",fresh
+  codex,"model:gpt-5.1-codex:5h",GPT-5.1-Codex session,100,"2026-03-16T01:41:58.000Z",fresh
 help[3]:
   Run `quota-axi --provider claude --json` for JSON output
   Run `quota-axi --full` to include account and source-attempt details
   Run `quota-axi auth` to inspect local auth source availability without printing secrets
+```
+
+`--json` emits the same normalized model as structured JSON instead of TOON:
+
+```sh
+$ quota-axi --provider claude --json
+{
+  "generatedAt": "2026-03-15T16:42:03.000Z",
+  "schemaVersion": 1,
+  "providers": [
+    {
+      "provider": "claude",
+      "label": "Claude",
+      "source": "oauth",
+      "plan": "pro",
+      "windows": [
+        {
+          "id": "five_hour",
+          "label": "session",
+          "kind": "session",
+          "percentUsed": 18,
+          "percentRemaining": 82,
+          "resetsAt": "2026-03-15T21:15:00.000Z"
+        },
+        {
+          "id": "model:fable",
+          "label": "Fable week",
+          "kind": "model",
+          "percentUsed": 29,
+          "percentRemaining": 71,
+          "resetsAt": "2026-03-20T09:30:00.000Z"
+        }
+      ],
+      "state": {
+        "status": "fresh",
+        "stale": false,
+        "sourcesTried": ["oauth"],
+        "refreshedAt": "2026-03-15T16:41:55.000Z"
+      }
+    }
+  ]
+}
 ```
 
 ```sh
@@ -60,16 +105,27 @@ help[1]:
 
 quota-axi requires Node.js 20 or newer.
 
-**npm**
+**Agent skill (recommended)**
+
+Install the skill in the [Agent Skills](https://agentskills.io) format with [`npx skills`](https://github.com/vercel-labs/skills):
 
 ```sh
-npm install -g quota-axi
+npx skills add kunchenguid/quota-axi --skill quota-axi -g
 ```
+
+The skill teaches your agent to run quota-axi through `npx -y quota-axi` on demand, so nothing needs to be installed ahead of time.
+`-g` installs the skill for all projects (e.g. `~/.claude/skills/`); drop it to install for the current project only (`.claude/skills/`).
 
 **Direct use**
 
 ```sh
 npx -y quota-axi
+```
+
+**npm**
+
+```sh
+npm install -g quota-axi
 ```
 
 **From source**
@@ -84,8 +140,8 @@ pnpm run dev
 
 ## Agent Skill
 
-The npm package includes `skills/quota-axi/SKILL.md`, an installable skill for agent runtimes that support local skills.
-The skill is generated from `src/skill.ts`; update it with `pnpm run build:skill` and verify it with `pnpm run build:skill -- --check`.
+The npm package includes `skills/quota-axi/SKILL.md`, the same installable skill recommended above.
+It is generated from `src/skill.ts`; update it with `pnpm run build:skill` and verify it with `pnpm run build:skill -- --check`.
 
 ## How It Works
 
@@ -133,7 +189,7 @@ The skill is generated from `src/skill.ts`; update it with `pnpm run build:skill
 | `--json`                  | Emit normalized JSON instead of TOON for quota or auth |
 | `--full`                  | Include quota account identity and source attempts     |
 | `--allow-keychain-prompt` | Permit macOS Claude Keychain access that could prompt  |
-| `-h`, `--help`            | Print terse AXI help                                   |
+| `-h`, `--help`            | Print terse [AXI](https://axi.md) help                 |
 | `-v`, `-V`, `--version`   | Print version                                          |
 
 ## Output Model
@@ -187,10 +243,6 @@ pnpm run dev                    # Run the CLI with tsx
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the no-mistakes PR workflow, generated-file rules, and release-please conventions.
-
-## Attribution
-
-quota-axi is independently implemented from local Baby Menu quota code and public provider behavior references.
 
 ## License
 
