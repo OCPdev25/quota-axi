@@ -134,7 +134,10 @@ pnpm run dev
 ## Output Model
 
 `--json` emits `schemaVersion: 1`.
-Quota reports contain `providers`, each with `provider`, `source`, `windows`, optional `plan`, optional `credits`, and `state`.
+Quota reports contain `providers`, each with `provider`, `label`, `source`, `windows`, `state`, optional `plan`, and optional `credits`.
+With `--full`, providers can also include `account` identity and per-source `attempts`.
+Provider `state` includes `status`, `stale`, `sourcesTried`, optional `refreshedAt`, optional `error`, and optional `retryAfter`.
+Quota windows include `id`, `label`, `kind`, optional percentages, optional reset fields, optional `windowSeconds`, and optional credit-spend fields.
 Account identity and per-source `attempts` are omitted unless `--full` is passed.
 Provider statuses are `fresh`, `stale`, `unavailable`, `auth_required`, `rate_limited`, or `error`.
 Provider sources are `oauth`, `cli-rpc`, `api`, `web`, `cache`, or `unavailable`; v1 emits `oauth`, `cli-rpc`, `cache`, and `unavailable`.
@@ -142,7 +145,9 @@ Window kinds are `session`, `weekly`, `monthly`, `model`, `credits`, or `unknown
 Source attempts use `success`, `failed`, or `skipped`.
 Claude can report `five_hour`, `seven_day`, optional `seven_day_opus`, and optional `extra_usage` windows.
 Codex can report `five_hour` and `weekly` windows plus optional credit balance data.
-`auth --json` reports auth sources with `available`, `missing`, `invalid`, `expired`, or `skipped` status.
+`auth --json` emits `generatedAt`, `schemaVersion: 1`, and `auth`, where each provider report has `provider` and `sources`.
+Auth source entries include `source`, optional `path`, `status`, and optional `error`.
+Auth source statuses are `available`, `missing`, `invalid`, `expired`, or `skipped`.
 Auth source names are `oauth-file`, `keychain`, `auth-json`, and `cli-rpc`.
 
 ## Security Posture
@@ -150,6 +155,7 @@ Auth source names are `oauth-file`, `keychain`, `auth-json`, and `cli-rpc`.
 quota-axi reads `~/.claude/.credentials.json` for Claude.
 On macOS, it reads `Claude Code-credentials` from Keychain only with `--allow-keychain-prompt`; when enabled, the Keychain credential is tried before file credentials.
 For Codex, it reads `$CODEX_HOME/auth.json` or `~/.codex/auth.json` before the read-only CLI fallback.
+Codex `auth.json` support is OAuth-token only; API key values such as `OPENAI_API_KEY` are treated as invalid for quota usage calls and are not sent to ChatGPT usage endpoints.
 It may run `codex -s read-only -a untrusted app-server` for Codex JSON-RPC fallback.
 It never launches the Claude CLI, so it cannot accidentally spend the quota it measures.
 
