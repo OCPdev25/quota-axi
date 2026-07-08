@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/kunchenguid/quota-axi/compare/quota-axi-v0.1.4...quota-axi-v0.1.5) (2026-07-08)
+
+
+### Bug Fixes
+
+* **providers:** detect Grok OIDC auth records ([#11](https://github.com/kunchenguid/quota-axi/issues/11)) ([7b33cc6](https://github.com/kunchenguid/quota-axi/commit/7b33cc65abbfb923da9fa114a77da34ada9e6079))
+
 ## [0.1.4](https://github.com/kunchenguid/quota-axi/compare/quota-axi-v0.1.3...quota-axi-v0.1.4) (2026-07-08)
 
 
