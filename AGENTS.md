@@ -17,8 +17,8 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 - Never launch the Claude CLI to probe quota, because that would spend the quota being measured.
 - The read-only Codex app-server JSON-RPC probe is the only CLI fallback.
 - The cache path is `~/.cache/quota-axi/quotas.json`, or under `$XDG_CACHE_HOME/quota-axi/` when `XDG_CACHE_HOME` is set.
-- The Claude Keychain access marker is stored alongside the cache and contains no credential material.
-- Cache files must be `0600` and contain only normalized non-secret snapshots.
+- The Claude Keychain access marker is stored alongside the cache, is `0600`, and contains no credential material.
+- Quota cache files must be `0600` and contain only normalized non-secret snapshots.
 - Only fresh provider snapshots with windows are cached.
 - Failed providers, stale providers, account identity, and source attempts are not cached.
 - Do not cache raw provider responses or credential headers.

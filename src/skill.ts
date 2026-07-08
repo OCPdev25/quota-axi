@@ -86,7 +86,8 @@ ${TOP_HELP.trimEnd()}
   every provider failed; exit code 2 means a usage error.
 - Percentages are not comparable across providers - quota-axi never claims one provider's
   percentage equals another's.
-- The cache at \`~/.cache/quota-axi/quotas.json\` only ever holds normalized non-secret
-  snapshots; nothing quota-axi prints or caches reveals credential values.
+- The quota cache at \`~/.cache/quota-axi/quotas.json\` only ever holds normalized
+  non-secret snapshots.
+  The Claude Keychain access marker lives alongside it and contains no credential values.
 `;
 }

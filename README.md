@@ -224,7 +224,8 @@ Auth source names are `oauth-file`, `keychain`, `auth-json`, and `cli-rpc`.
 ## Security Posture
 
 quota-axi reads `~/.claude/.credentials.json` for Claude.
-On macOS, it reads the `Claude Code-credentials` Keychain value with `--allow-keychain-prompt`, and records a non-secret access marker after a successful read.
+On macOS, it reads the `Claude Code-credentials` Keychain value with `--allow-keychain-prompt` or, after a non-secret access marker exists, on plain calls.
+quota-axi records that marker after any successful Keychain value read.
 When that marker exists, plain calls read the Keychain value again so an already-approved "Always Allow" grant keeps live Claude quota fresh.
 Without the flag or marker, quota-axi may perform a non-secret Keychain item presence check so it only suggests Keychain access when a Claude credential item exists.
 For Codex, it reads `$CODEX_HOME/auth.json` or `~/.codex/auth.json` before the read-only CLI fallback.
@@ -235,7 +236,8 @@ It never launches the Claude CLI, so it cannot accidentally spend the quota it m
 Direct HTTP requests go only to Anthropic and OpenAI first-party usage endpoints with the user's local credentials.
 It sends credential values only to the first-party provider request they authenticate.
 It never prints, logs, or caches credential values.
-The cache lives at `~/.cache/quota-axi/quotas.json` (or under `$XDG_CACHE_HOME/quota-axi/` when `XDG_CACHE_HOME` is set), uses `0600` file permissions, and stores normalized non-secret snapshots only.
+The quota cache lives at `~/.cache/quota-axi/quotas.json` (or under `$XDG_CACHE_HOME/quota-axi/` when `XDG_CACHE_HOME` is set), uses `0600` file permissions, and stores normalized non-secret snapshots only.
+The Claude Keychain access marker lives alongside it as `claude-keychain-access-granted`, uses `0600` file permissions, and contains no credential material.
 Only fresh provider snapshots with windows are cached.
 Failed providers, stale providers, account identity, and source attempts are not cached.
 
