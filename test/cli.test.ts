@@ -68,6 +68,119 @@ describe("CLI argument parsing", () => {
       "unsupported provider",
     );
   });
+
+  it("parses watch command flags", () => {
+    expect(
+      parseArgs([
+        "watch",
+        "--interval",
+        "15",
+        "--provider",
+        "codex,grok",
+        "--once",
+      ]),
+    ).toMatchObject({
+      command: "watch",
+      providers: ["codex", "grok"],
+      intervalSeconds: 15,
+      once: true,
+      refresh: false,
+      full: false,
+    });
+    expect(parseArgs(["watch", "--refresh", "--json"])).toMatchObject({
+      command: "watch",
+      refresh: true,
+      json: true,
+    });
+  });
+
+  it("rejects invalid watch intervals", () => {
+    expect(() => parseArgs(["watch", "--interval", "0"])).toThrow(
+      "positive number",
+    );
+  });
+});
+
+describe("CLI watch rendering", () => {
+  it("renders once from injectable snapshot without provider fetches", async () => {
+    useTempCache();
+    let providerFetches = 0;
+    PROVIDERS.codex = {
+      id: "codex",
+      label: "Codex",
+      async fetchQuota() {
+        providerFetches += 1;
+        throw new Error("provider must not be called on default watch");
+      },
+      async inspectAuth() {
+        return { provider: "codex", sources: [] };
+      },
+    };
+    const chunks: string[] = [];
+    await main({
+      argv: ["watch", "--provider", "codex", "--once"],
+      binPath: "quota-axi",
+      stdout: {
+        write(chunk) {
+          chunks.push(String(chunk));
+          return true;
+        },
+        isTTY: false,
+      },
+      watchDeps: {
+        getSnapshot: async () => ({
+          generatedAt: "2026-07-09T11:20:00.000Z",
+          schemaVersion: 1 as const,
+          mode: "cache" as const,
+          providers: [
+            {
+              provider: "codex" as const,
+              label: "Codex",
+              trust: "cached" as const,
+              status: "stale" as const,
+              source: "cache" as const,
+              windows: [
+                {
+                  id: "five_hour",
+                  label: "session",
+                  kind: "session" as const,
+                  percentRemaining: 20,
+                  percentUsed: 80,
+                  resetsAt: "2026-07-09T16:00:00.000Z",
+                  resetInSeconds: 18000,
+                  burnRate: {
+                    available: false as const,
+                    reason: "insufficient_data" as const,
+                  },
+                  level: "warn" as const,
+                },
+              ],
+              primary: {
+                id: "five_hour",
+                label: "session",
+                kind: "session" as const,
+                percentRemaining: 20,
+                percentUsed: 80,
+                resetsAt: "2026-07-09T16:00:00.000Z",
+                resetInSeconds: 18000,
+                burnRate: {
+                  available: false as const,
+                  reason: "insufficient_data" as const,
+                },
+                level: "warn" as const,
+              },
+            },
+          ],
+        }),
+      },
+    });
+    const output = chunks.join("");
+    expect(providerFetches).toBe(0);
+    expect(output).toContain("Codex");
+    expect(output).toContain("WARN");
+    expect(output).toContain("RED LINE");
+    expect(output).not.toMatch(/\$\d/);
+  });
 });
 
 describe("CLI quota rendering", () => {
