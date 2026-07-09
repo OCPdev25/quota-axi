@@ -53,11 +53,11 @@ or when comparing supported local provider headroom side by side.
 ## Usage
 
 ```
-usage: quota-axi [auth] [flags]
-commands[2]:
-  (none)=quota, auth
-flags[6]:
-  --provider <claude,codex,cursor,copilot,grok,agy>, --json, --full, --allow-keychain-prompt, --help, -v/--version
+usage: quota-axi [auth|watch] [flags]
+commands[3]:
+  (none)=quota, auth, watch
+flags[9]:
+  --provider <claude,codex,cursor,copilot,grok,agy>, --json, --full, --allow-keychain-prompt, --interval <seconds>, --refresh, --once, --help, -v/--version
 examples:
   quota-axi
   quota-axi --provider claude
@@ -66,6 +66,9 @@ examples:
   quota-axi --json
   quota-axi --full
   quota-axi auth
+  quota-axi watch
+  quota-axi watch --interval 15 --provider codex,grok
+  quota-axi watch --refresh --once
 ```
 
 ## Tips
