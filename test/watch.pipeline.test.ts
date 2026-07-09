@@ -1,15 +1,17 @@
 /**
  * Watch pipeline integration harness (test seat).
- * Pins fixture providers through getWatchSnapshot end to end:
- * fresh / stale / rate_limited / missing-data, red-line thresholds,
- * and the untaxed agent path (default refresh=false never fetches).
+ * Pins fixture providers through getWatchSnapshot → renderWatchPane / CLI
+ * watch end to end: fresh / stale / rate_limited / missing-data, red-line
+ * thresholds, and the untaxed agent path (default refresh=false never fetches).
  */
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { writeCachedProviders } from "../src/cache.js";
+import { main } from "../src/cli.js";
 import { normalizeAgyQuotaSummary } from "../src/providers/agy.js";
+import { PROVIDERS } from "../src/providers/index.js";
 import {
   buildWatchSnapshot,
   getWatchSnapshot,
@@ -22,16 +24,30 @@ import type {
   ProviderQuota,
   QuotaWindow,
 } from "../src/types.js";
+import { renderWatchPane } from "../src/watch-render.js";
 
+const originalClaudeProvider = PROVIDERS.claude;
+const originalCodexProvider = PROVIDERS.codex;
+const originalCursorProvider = PROVIDERS.cursor;
+const originalCopilotProvider = PROVIDERS.copilot;
+const originalGrokProvider = PROVIDERS.grok;
+const originalAgyProvider = PROVIDERS.agy;
 const originalXdgCacheHome = process.env.XDG_CACHE_HOME;
 let tempDir: string | undefined;
 
 afterEach(() => {
   vi.restoreAllMocks();
+  PROVIDERS.claude = originalClaudeProvider;
+  PROVIDERS.codex = originalCodexProvider;
+  PROVIDERS.cursor = originalCursorProvider;
+  PROVIDERS.copilot = originalCopilotProvider;
+  PROVIDERS.grok = originalGrokProvider;
+  PROVIDERS.agy = originalAgyProvider;
   if (originalXdgCacheHome === undefined) delete process.env.XDG_CACHE_HOME;
   else process.env.XDG_CACHE_HOME = originalXdgCacheHome;
   if (tempDir) rmSync(tempDir, { recursive: true, force: true });
   tempDir = undefined;
+  process.exitCode = undefined;
 });
 
 const NOW = new Date("2026-07-09T12:00:00.000Z");
@@ -305,6 +321,177 @@ describe("watch pipeline: agent read path untaxed", () => {
       "critical",
       "warn",
     ]);
+  });
+});
+
+describe("watch pipeline: snapshot → render e2e", () => {
+  it("renders red-line markers for multi-provider fixture matrix", () => {
+    const snapshot = buildWatchSnapshot(
+      [
+        quota("agy", {
+          windows: [
+            {
+              ...sessionWindow("gemini_5h", 5),
+              label: "Gemini 5-hour",
+            },
+          ],
+          status: "fresh",
+          source: "cli-rpc",
+          plan: "Google AI Pro",
+        }),
+        quota("claude", {
+          windows: [
+            {
+              ...sessionWindow("five_hour", 20),
+              label: "5-hour",
+            },
+          ],
+          status: "stale",
+          source: "cache",
+          stale: true,
+          refreshedAt: "2026-07-09T08:00:00.000Z",
+        }),
+        quota("codex", {
+          windows: [
+            {
+              ...sessionWindow("five_hour", 55),
+              label: "5-hour",
+            },
+          ],
+          status: "rate_limited",
+          source: "api",
+          error: "retry_after",
+        }),
+        quota("grok", {
+          windows: [],
+          status: "auth_required",
+          source: "unavailable",
+          error: "credentials_missing",
+        }),
+      ],
+      { mode: "cache", now: NOW, generatedAt: NOW.toISOString() },
+    );
+
+    const pane = renderWatchPane(snapshot, { color: false });
+
+    expect(pane).toContain("quota-axi watch");
+    expect(pane).toContain("mode=cache");
+    expect(pane).toContain("Antigravity");
+    expect(pane).toContain("CRIT");
+    expect(pane).toContain("WARN");
+    expect(pane).toContain("RED LINE");
+    expect(pane).toContain("agy/gemini_5h remaining 5%");
+    expect(pane).toContain("claude/five_hour remaining 20%");
+    expect(pane).toContain("unavailable");
+    expect(pane).toContain("credentials_missing");
+    expect(pane).toContain("retry_after");
+    expect(pane).not.toMatch(/\$\d/);
+    expect(pane).not.toContain("USD");
+  });
+
+  it("cache getWatchSnapshot output paints without live provider calls", async () => {
+    useTempCache();
+    writeCachedProviders([
+      quota("agy", {
+        windows: [
+          {
+            id: "gemini_5h",
+            label: "Gemini 5-hour",
+            kind: "session",
+            percentUsed: 95,
+            percentRemaining: 5,
+            resetsAt: "2026-07-09T17:00:00.000Z",
+            windowSeconds: 18000,
+          },
+        ],
+        status: "fresh",
+        source: "cli-rpc",
+        refreshedAt: "2026-07-09T11:00:00.000Z",
+      }),
+    ]);
+
+    const fetchProvider = vi.fn(async () => {
+      throw new Error("live provider must not be called on render path");
+    });
+    const snapshot = await getWatchSnapshot(
+      { providers: ["agy"], refresh: false, now: NOW },
+      { fetchProvider },
+    );
+    const pane = renderWatchPane(snapshot, { color: false });
+
+    expect(fetchProvider).not.toHaveBeenCalled();
+    expect(snapshot.mode).toBe("cache");
+    expect(pane).toContain("CRIT");
+    expect(pane).toContain("RED LINE");
+    expect(pane).toContain("rem   5%");
+  });
+});
+
+describe("watch pipeline: CLI default path untaxed", () => {
+  it("quota-axi watch uses cache snapshot and never calls PROVIDERS", async () => {
+    useTempCache();
+    writeCachedProviders([
+      quota("codex", {
+        windows: [
+          {
+            id: "five_hour",
+            label: "session",
+            kind: "session",
+            percentUsed: 80,
+            percentRemaining: 20,
+            resetsAt: "2026-07-09T17:00:00.000Z",
+            windowSeconds: 18000,
+          },
+        ],
+        status: "fresh",
+        source: "oauth",
+        refreshedAt: "2026-07-09T11:00:00.000Z",
+      }),
+    ]);
+
+    let providerFetches = 0;
+    const boom = async () => {
+      providerFetches += 1;
+      throw new Error("live provider must not be called on default watch");
+    };
+    for (const id of [
+      "claude",
+      "codex",
+      "cursor",
+      "copilot",
+      "grok",
+      "agy",
+    ] as const) {
+      PROVIDERS[id] = {
+        id,
+        label: id,
+        fetchQuota: boom,
+        inspectAuth: async () => ({ provider: id, sources: [] }),
+      };
+    }
+
+    const chunks: string[] = [];
+    await main({
+      argv: ["watch", "--provider", "codex", "--once"],
+      binPath: "quota-axi",
+      stdout: {
+        write(chunk) {
+          chunks.push(String(chunk));
+          return true;
+        },
+        isTTY: false,
+      },
+      // Intentionally no watchDeps.getSnapshot: exercise real cache path.
+    });
+
+    const output = chunks.join("");
+    expect(providerFetches).toBe(0);
+    expect(output).toContain("quota-axi watch");
+    expect(output).toContain("mode=cache");
+    expect(output).toContain("WARN");
+    expect(output).toContain("RED LINE");
+    expect(output).toContain("rem  20%");
+    expect(output).not.toMatch(/\$\d/);
   });
 });
 
