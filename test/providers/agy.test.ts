@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { writeCachedProviders } from "../../src/cache.js";
 import {
   fetchQuotaWithRuntime,
@@ -17,6 +17,10 @@ import type { ProviderQuota } from "../../src/types.js";
 
 const originalXdgCacheHome = process.env.XDG_CACHE_HOME;
 let tempDir: string | undefined;
+
+beforeEach(() => {
+  useTempCache();
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -366,6 +370,7 @@ agy ${pid} test 8u IPv4 0x1 0t0 TCP 127.0.0.1:${port} (LISTEN)
 }
 
 function useTempCache(): void {
+  if (tempDir) rmSync(tempDir, { recursive: true, force: true });
   tempDir = mkdtempSync(join(tmpdir(), "quota-axi-agy-cache-"));
   process.env.XDG_CACHE_HOME = tempDir;
 }
