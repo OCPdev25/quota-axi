@@ -11,6 +11,7 @@ import {
   renderError,
   renderQuotaToon,
 } from "./render.js";
+import { getWatchSnapshot } from "./snapshot.js";
 import type {
   AuthProviderReport,
   ProviderId,
@@ -18,15 +19,20 @@ import type {
   ProviderQuota,
   QuotaAxiResponse,
 } from "./types.js";
+import {
+  defaultWatchIntervalSeconds,
+  runWatchLoop,
+  type WatchLoopDeps,
+} from "./watch.js";
 
 export const DESCRIPTION =
   "Report local agent-provider quota windows for routing-aware agents.";
 
-export const TOP_HELP = `usage: quota-axi [auth] [flags]
-commands[2]:
-  (none)=quota, auth
-flags[6]:
-  --provider <claude,codex,cursor,copilot,grok,agy>, --json, --full, --allow-keychain-prompt, --help, -v/--version
+export const TOP_HELP = `usage: quota-axi [auth|watch] [flags]
+commands[3]:
+  (none)=quota, auth, watch
+flags[9]:
+  --provider <claude,codex,cursor,copilot,grok,agy>, --json, --full, --allow-keychain-prompt, --interval <seconds>, --refresh, --once, --help, -v/--version
 examples:
   quota-axi
   quota-axi --provider claude
@@ -35,20 +41,27 @@ examples:
   quota-axi --json
   quota-axi --full
   quota-axi auth
+  quota-axi watch
+  quota-axi watch --interval 15 --provider codex,grok
+  quota-axi watch --refresh --once
 `;
 
 type MainOptions = {
   argv?: string[];
-  stdout?: Pick<NodeJS.WriteStream, "write">;
+  stdout?: Pick<NodeJS.WriteStream, "write" | "isTTY">;
   binPath?: string;
+  watchDeps?: Partial<WatchLoopDeps>;
 };
 
 type ParsedArgs = {
-  command: "quota" | "auth" | "help" | "version";
+  command: "quota" | "auth" | "watch" | "help" | "version";
   providers: ProviderId[];
   json: boolean;
   full: boolean;
   allowKeychainPrompt: boolean;
+  intervalSeconds: number;
+  refresh: boolean;
+  once: boolean;
 };
 
 export async function main(options: MainOptions = {}): Promise<void> {
@@ -76,6 +89,10 @@ export async function main(options: MainOptions = {}): Promise<void> {
       } else {
         stdout.write(`${renderAuthToon(reports, binPath)}\n`);
       }
+      return;
+    }
+    if (parsed.command === "watch") {
+      await runWatchCommand(parsed, stdout, options.watchDeps);
       return;
     }
 
@@ -111,6 +128,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let json = false;
   let full = false;
   let allowKeychainPrompt = false;
+  let intervalSeconds = defaultWatchIntervalSeconds();
+  let refresh = false;
+  let once = false;
 
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
@@ -119,6 +139,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
     }
     if (arg === "auth") {
       command = "auth";
+      continue;
+    }
+    if (arg === "watch") {
+      command = "watch";
       continue;
     }
     if (arg === "--help" || arg === "-h") {
@@ -139,6 +163,25 @@ export function parseArgs(argv: string[]): ParsedArgs {
     }
     if (arg === "--allow-keychain-prompt") {
       allowKeychainPrompt = true;
+      continue;
+    }
+    if (arg === "--refresh") {
+      refresh = true;
+      continue;
+    }
+    if (arg === "--once") {
+      once = true;
+      continue;
+    }
+    if (arg === "--interval" || arg === "-i") {
+      const value = argv[index + 1];
+      if (!value) throw new Error("--interval requires seconds");
+      intervalSeconds = parseIntervalSeconds(value);
+      index++;
+      continue;
+    }
+    if (arg.startsWith("--interval=")) {
+      intervalSeconds = parseIntervalSeconds(arg.slice("--interval=".length));
       continue;
     }
     if (arg === "--provider") {
@@ -162,7 +205,89 @@ export function parseArgs(argv: string[]): ParsedArgs {
     json,
     full,
     allowKeychainPrompt,
+    intervalSeconds,
+    refresh,
+    once,
   };
+}
+
+async function runWatchCommand(
+  parsed: ParsedArgs,
+  stdout: Pick<NodeJS.WriteStream, "write" | "isTTY">,
+  watchDeps?: Partial<WatchLoopDeps>,
+): Promise<void> {
+  const isTty = Boolean(
+    watchDeps?.isTty ??
+    ("isTTY" in stdout ? stdout.isTTY : process.stdout.isTTY),
+  );
+  const getSnapshot =
+    watchDeps?.getSnapshot ??
+    ((options) =>
+      getWatchSnapshot({
+        ...options,
+        providers: parsed.providers,
+        refresh: parsed.refresh,
+        allowKeychainPrompt: parsed.allowKeychainPrompt,
+      }));
+
+  if (parsed.json) {
+    const snapshot = await getSnapshot({
+      providers: parsed.providers,
+      refresh: parsed.refresh,
+      allowKeychainPrompt: parsed.allowKeychainPrompt,
+    });
+    stdout.write(`${JSON.stringify(snapshot, null, 2)}\n`);
+    return;
+  }
+
+  await runWatchLoop(
+    {
+      intervalMs: parsed.intervalSeconds * 1000,
+      snapshot: {
+        providers: parsed.providers,
+        refresh: parsed.refresh,
+        allowKeychainPrompt: parsed.allowKeychainPrompt,
+      },
+      render: {
+        full: parsed.full,
+        color: isTty,
+      },
+      once: parsed.once || !isTty,
+    },
+    {
+      getSnapshot,
+      write: (chunk) => {
+        stdout.write(chunk);
+      },
+      clear:
+        watchDeps?.clear ??
+        (() => {
+          if (isTty) stdout.write("\u001b[H\u001b[2J");
+        }),
+      sleep: watchDeps?.sleep,
+      isTty,
+      shouldContinue: watchDeps?.shouldContinue,
+      onSignal:
+        watchDeps?.onSignal ??
+        ((handler) => {
+          const onSig = () => handler();
+          process.once("SIGINT", onSig);
+          process.once("SIGTERM", onSig);
+          return () => {
+            process.off("SIGINT", onSig);
+            process.off("SIGTERM", onSig);
+          };
+        }),
+    },
+  );
+}
+
+function parseIntervalSeconds(value: string): number {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    throw new Error("--interval must be a positive number of seconds");
+  }
+  return seconds;
 }
 
 async function fetchQuota(

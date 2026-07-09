@@ -31,6 +31,7 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 - Failed providers, stale providers, account identity, and source attempts are not cached.
 - Do not cache raw provider responses or credential headers.
 - Watch snapshots live in `src/snapshot.ts`: `getWatchSnapshot` / `buildWatchSnapshot` produce a render-ready `WatchSnapshot` (remaining %, reset countdown, derived burn rate or honest unavailable, trust/staleness). Default `refresh: false` is cache/last-known only so the agent read path stays untaxed; `refresh: true` is the only path that fetches providers. Snapshots never include account identity or USD fields.
+- Watch TUI lives in `src/watch-render.ts` (`renderWatchPane`) and `src/watch.ts` (`runWatchLoop`); CLI `quota-axi watch` defaults to cache-only snapshots (`refresh: false`), paints remaining % / reset countdown / burn rate / trust, red-line markers from `SnapshotWindow.level`, and never shows USD outside `--full`.
 
 ## Development
 

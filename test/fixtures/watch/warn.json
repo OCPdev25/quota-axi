@@ -1,0 +1,69 @@
+{
+  "generatedAt": "2026-07-09T11:20:00.000Z",
+  "schemaVersion": 1,
+  "mode": "cache",
+  "providers": [
+    {
+      "provider": "agy",
+      "label": "Antigravity",
+      "trust": "cached",
+      "status": "stale",
+      "source": "cache",
+      "refreshedAt": "2026-07-09T10:00:00.000Z",
+      "plan": "Google AI Pro",
+      "windows": [
+        {
+          "id": "gemini_5h",
+          "label": "Gemini 5-hour",
+          "kind": "session",
+          "percentRemaining": 20,
+          "percentUsed": 80,
+          "resetsAt": "2026-07-09T16:00:00.000Z",
+          "resetInSeconds": 18000,
+          "burnRate": {
+            "available": true,
+            "percentPerHour": 1.8
+          },
+          "level": "warn"
+        },
+        {
+          "id": "gemini_weekly",
+          "label": "Gemini weekly",
+          "kind": "weekly",
+          "percentRemaining": 82,
+          "percentUsed": 18,
+          "resetsAt": "2026-07-14T08:00:00.000Z",
+          "resetInSeconds": 420000,
+          "burnRate": {
+            "available": false,
+            "reason": "insufficient_data"
+          },
+          "level": "ok"
+        }
+      ],
+      "primary": {
+        "id": "gemini_5h",
+        "label": "Gemini 5-hour",
+        "kind": "session",
+        "percentRemaining": 20,
+        "percentUsed": 80,
+        "resetsAt": "2026-07-09T16:00:00.000Z",
+        "resetInSeconds": 18000,
+        "burnRate": {
+          "available": true,
+          "percentPerHour": 1.8
+        },
+        "level": "warn"
+      }
+    },
+    {
+      "provider": "claude",
+      "label": "Claude",
+      "trust": "unavailable",
+      "status": "auth_required",
+      "source": "unavailable",
+      "windows": [],
+      "error": "credentials_missing"
+    }
+  ]
+}
