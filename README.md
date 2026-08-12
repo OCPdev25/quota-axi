@@ -107,6 +107,27 @@ $ quota-axi --provider claude --json
 }
 ```
 
+### Gate automation on remaining quota
+
+Use `--fail-below` when a script or agent needs a process result instead of parsing every provider window itself:
+
+```sh
+quota-axi --provider codex --fail-below 20 --json
+```
+
+The normal quota report gains a `threshold` result and any concrete `breaches`.
+The gate passes when every requested provider exposes at least one percentage and every measured window has at least the requested percentage remaining.
+It fails closed instead of treating missing data as healthy.
+
+| Exit code | Threshold result                                                                 |
+| --------- | -------------------------------------------------------------------------------- |
+| `0`       | Every requested provider is measurable and no window is below the floor          |
+| `3`       | At least one measured window is below the floor                                  |
+| `4`       | No breach is known, but at least one requested provider has no measurable window |
+
+Existing exit codes still take precedence: `1` means every provider failed and `2` means invalid CLI usage.
+The comparison is data only; it does not route work or claim percentages are equivalent across providers.
+
 ```sh
 $ quota-axi auth
 bin: ~/.npm/_npx/.../quota-axi
@@ -195,15 +216,16 @@ It is generated from `src/skill.ts`; update it with `pnpm run build:skill` and v
 
 - **Live first** - direct provider HTTP calls use 15 second request timeouts, Codex JSON-RPC reads use short per-call timeouts, and stale cache fallback is per provider.
 - **No first-run Keychain prompt** - macOS Claude Keychain value reads are skipped on plain calls until `--allow-keychain-prompt` succeeds once, then future plain calls reuse that existing grant.
-- **Partial success is success** - one provider can fail while another returns fresh or stale data, and the process still exits 0. Exit code 1 means every provider failed, and 2 means a usage error.
+- **Partial success is success** - without a threshold gate, one provider can fail while another returns fresh or stale data, and the process still exits 0. Exit code 1 means every provider failed, and 2 means a usage error.
 - **No token equivalence** - quota-axi does not claim that one provider percentage equals another provider percentage.
 
 ## CLI Reference
 
-| Command     | Description                                      |
-| ----------- | ------------------------------------------------ |
-| `quota-axi` | Report supported local quota windows             |
-| `auth`      | Report local auth-source availability, no values |
+| Command           | Description                                              |
+| ----------------- | -------------------------------------------------------- |
+| `quota-axi`       | Report supported local quota windows                     |
+| `quota-axi auth`  | Report local auth-source availability, no values         |
+| `quota-axi watch` | Render cached quota continuously; `--refresh` fetches it |
 
 ### Flags
 
@@ -212,7 +234,11 @@ It is generated from `src/skill.ts`; update it with `pnpm run build:skill` and v
 | `--provider claude,codex,cursor,copilot,grok,agy` | Scope providers                                        |
 | `--json`                                          | Emit normalized JSON instead of TOON for quota or auth |
 | `--full`                                          | Include quota account identity and source attempts     |
+| `--fail-below <percent>`                          | Exit nonzero when quota is below or cannot prove floor |
 | `--allow-keychain-prompt`                         | Permit macOS Claude Keychain access that could prompt  |
+| `--interval <seconds>`                            | Set the `watch` refresh interval (default: 30)         |
+| `--refresh`                                       | Let `watch` fetch live provider data                   |
+| `--once`                                          | Render one `watch` snapshot and exit                   |
 | `-h`, `--help`                                    | Print terse [AXI](https://axi.md) help                 |
 | `-v`, `-V`, `--version`                           | Print version                                          |
 
@@ -224,11 +250,17 @@ It is generated from `src/skill.ts`; update it with `pnpm run build:skill` and v
 
 | Object                        | Fields                                                                                     |
 | ----------------------------- | ------------------------------------------------------------------------------------------ |
-| Quota report                  | `providers`                                                                                |
+| Quota report                  | `providers`, plus optional `threshold` when `--fail-below` is used                         |
 | Provider report               | `provider`, `label`, `source`, `windows`, `state`, optional `plan`, and optional `credits` |
 | Provider report with `--full` | Optional `account` identity and per-source `attempts`                                      |
 
 Account identity and per-source `attempts` are omitted unless `--full` is passed.
+
+### Threshold result
+
+`--fail-below` adds `minimumRemainingPercent`, `status`, `measuredWindows`, `unknownProviders`, and `breaches`.
+Status is `pass`, `fail`, or `unknown`; a value exactly equal to the floor passes.
+Each breach names the provider and window with its measured `percentRemaining`.
 
 ### Provider `state`
 

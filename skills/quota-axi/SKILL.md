@@ -41,10 +41,13 @@ or when comparing supported local provider headroom side by side.
 1. Run `npx -y quota-axi` for compact TOON output covering supported providers' quota windows.
 2. Scope to one provider with `--provider claude` or to a subset with `--provider cursor,copilot,grok,agy`.
 3. Pass `--json` for the normalized machine-readable model instead of TOON.
-4. Pass `--full` to include account identity and per-source attempt details.
-5. Run `npx -y quota-axi auth` to check local auth-source availability without printing
+4. Use `--provider codex --fail-below 20` when automation needs a fail-closed process result:
+   exit 3 means a measured window is below the floor, while exit 4 means a requested
+   provider exposed no measurable percentage.
+5. Pass `--full` to include account identity and per-source attempt details.
+6. Run `npx -y quota-axi auth` to check local auth-source availability without printing
    secret values.
-6. On macOS, Claude Keychain value reads are skipped by default until the user grants access once.
+7. On macOS, Claude Keychain value reads are skipped by default until the user grants access once.
    If quota output reports `reason: keychain_access_required`, tell your user to run
    `quota-axi --allow-keychain-prompt` once and approve Keychain access ("Always Allow").
    After that successful grant, plain `quota-axi` calls reuse the existing Keychain access
@@ -56,8 +59,8 @@ or when comparing supported local provider headroom side by side.
 usage: quota-axi [auth|watch] [flags]
 commands[3]:
   (none)=quota, auth, watch
-flags[9]:
-  --provider <claude,codex,cursor,copilot,grok,agy>, --json, --full, --allow-keychain-prompt, --interval <seconds>, --refresh, --once, --help, -v/--version
+flags[10]:
+  --provider <claude,codex,cursor,copilot,grok,agy>, --json, --full, --fail-below <percent>, --allow-keychain-prompt, --interval <seconds>, --refresh, --once, --help, -v/--version
 examples:
   quota-axi
   quota-axi --provider claude
@@ -65,6 +68,7 @@ examples:
   quota-axi --provider cursor,copilot,grok,agy
   quota-axi --json
   quota-axi --full
+  quota-axi --provider codex --fail-below 20
   quota-axi auth
   quota-axi watch
   quota-axi watch --interval 15 --provider codex,grok
@@ -75,8 +79,10 @@ examples:
 
 - Output is TOON-encoded and token-efficient by default; pass `--json` only when you need
   the normalized schema.
-- Exit code 0 means at least one provider returned data (fresh or stale); exit code 1 means
-  every provider failed; exit code 2 means a usage error.
+- Without `--fail-below`, exit code 0 means at least one provider returned data (fresh or stale),
+  exit code 1 means every provider failed, and exit code 2 means a usage error.
+- With `--fail-below`, exit code 3 means a measured breach and exit code 4 means the gate
+  could not prove the floor because at least one requested provider had no measurable window.
 - Percentages are not comparable across providers - quota-axi never claims one provider's
   percentage equals another's.
 - The quota cache at `~/.cache/quota-axi/quotas.json` only ever holds normalized
