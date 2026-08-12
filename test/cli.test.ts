@@ -99,6 +99,26 @@ describe("CLI argument parsing", () => {
       "positive number",
     );
   });
+
+  it("parses quota threshold gates", () => {
+    expect(parseArgs(["--fail-below", "20"]).failBelow).toBe(20);
+    expect(parseArgs(["--fail-below=12.5"]).failBelow).toBe(12.5);
+    expect(parseArgs(["--fail-below", "0"]).failBelow).toBe(0);
+    expect(parseArgs(["--fail-below", "100"]).failBelow).toBe(100);
+  });
+
+  it("rejects invalid or command-incompatible threshold gates", () => {
+    expect(() => parseArgs(["--fail-below", "-1"])).toThrow("0 to 100");
+    expect(() => parseArgs(["--fail-below", "101"])).toThrow("0 to 100");
+    expect(() => parseArgs(["--fail-below", "nope"])).toThrow("0 to 100");
+    expect(() => parseArgs(["--fail-below="])).toThrow("0 to 100");
+    expect(() => parseArgs(["auth", "--fail-below", "20"])).toThrow(
+      "only supported for quota reports",
+    );
+    expect(() => parseArgs(["watch", "--fail-below", "20"])).toThrow(
+      "only supported for quota reports",
+    );
+  });
 });
 
 describe("CLI watch rendering", () => {
@@ -404,6 +424,103 @@ describe("CLI quota rendering", () => {
       output.providers.find((provider) => provider.provider === "claude")?.state
         .reason,
     ).toBeUndefined();
+  });
+
+  it("reports threshold breaches and exits 3", async () => {
+    useTempCache();
+    PROVIDERS.claude = providerWithQuota({
+      ...freshClaudeQuota(),
+      windows: [
+        {
+          id: "five_hour",
+          label: "session",
+          kind: "session",
+          percentUsed: 88,
+          percentRemaining: 12,
+        },
+      ],
+    });
+    const chunks: string[] = [];
+
+    await main({
+      argv: ["--provider", "claude", "--fail-below", "20"],
+      binPath: "quota-axi",
+      stdout: {
+        write(chunk) {
+          chunks.push(String(chunk));
+          return true;
+        },
+      },
+    });
+
+    const output = chunks.join("");
+    expect(output).toContain(
+      "threshold:\n  minimumRemainingPercent: 20\n  status: fail\n  measuredWindows: 1",
+    );
+    expect(output).toContain(
+      "breaches[1]{provider,id,label,percentRemaining}:",
+    );
+    expect(output).toContain("claude,five_hour,session,12");
+    expect(process.exitCode).toBe(3);
+  });
+
+  it("passes at the exact threshold and exposes the result in JSON", async () => {
+    useTempCache();
+    PROVIDERS.claude = providerWithQuota(freshClaudeQuota());
+    const chunks: string[] = [];
+
+    await main({
+      argv: ["--provider", "claude", "--fail-below", "90", "--json"],
+      binPath: "quota-axi",
+      stdout: {
+        write(chunk) {
+          chunks.push(String(chunk));
+          return true;
+        },
+      },
+    });
+
+    const output = JSON.parse(chunks.join("")) as QuotaAxiResponse;
+    expect(output.threshold).toEqual({
+      minimumRemainingPercent: 90,
+      status: "pass",
+      measuredWindows: 1,
+      unknownProviders: [],
+      breaches: [],
+    });
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("fails closed with exit 4 when a requested provider has no measurable window", async () => {
+    useTempCache();
+    PROVIDERS.copilot = providerWithQuota({
+      provider: "copilot",
+      label: "GitHub Copilot",
+      source: "api",
+      windows: [],
+      state: {
+        status: "fresh",
+        stale: false,
+        sourcesTried: ["api"],
+      },
+    });
+    const chunks: string[] = [];
+
+    await main({
+      argv: ["--provider", "copilot", "--fail-below", "20"],
+      binPath: "quota-axi",
+      stdout: {
+        write(chunk) {
+          chunks.push(String(chunk));
+          return true;
+        },
+      },
+    });
+
+    const output = chunks.join("");
+    expect(output).toContain("status: unknown");
+    expect(output).toContain("unknownProviders[1]: copilot");
+    expect(process.exitCode).toBe(4);
   });
 });
 

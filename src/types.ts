@@ -86,7 +86,23 @@ export type QuotaAxiResponse = {
   generatedAt: string;
   schemaVersion: 2;
   providers: ProviderQuota[];
+  threshold?: QuotaThresholdResult;
   help?: string[];
+};
+
+export type QuotaThresholdBreach = {
+  provider: ProviderId;
+  id: string;
+  label: string;
+  percentRemaining: number;
+};
+
+export type QuotaThresholdResult = {
+  minimumRemainingPercent: number;
+  status: "pass" | "fail" | "unknown";
+  measuredWindows: number;
+  unknownProviders: ProviderId[];
+  breaches: QuotaThresholdBreach[];
 };
 
 export type ProviderOptions = {

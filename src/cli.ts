@@ -12,6 +12,7 @@ import {
   renderQuotaToon,
 } from "./render.js";
 import { getWatchSnapshot } from "./snapshot.js";
+import { evaluateQuotaThreshold } from "./threshold.js";
 import type {
   AuthProviderReport,
   ProviderId,
@@ -31,8 +32,8 @@ export const DESCRIPTION =
 export const TOP_HELP = `usage: quota-axi [auth|watch] [flags]
 commands[3]:
   (none)=quota, auth, watch
-flags[9]:
-  --provider <claude,codex,cursor,copilot,grok,agy>, --json, --full, --allow-keychain-prompt, --interval <seconds>, --refresh, --once, --help, -v/--version
+flags[10]:
+  --provider <claude,codex,cursor,copilot,grok,agy>, --json, --full, --fail-below <percent>, --allow-keychain-prompt, --interval <seconds>, --refresh, --once, --help, -v/--version
 examples:
   quota-axi
   quota-axi --provider claude
@@ -40,6 +41,7 @@ examples:
   quota-axi --provider cursor,copilot,grok,agy
   quota-axi --json
   quota-axi --full
+  quota-axi --provider codex --fail-below 20
   quota-axi auth
   quota-axi watch
   quota-axi watch --interval 15 --provider codex,grok
@@ -62,6 +64,7 @@ type ParsedArgs = {
   intervalSeconds: number;
   refresh: boolean;
   once: boolean;
+  failBelow?: number;
 };
 
 export async function main(options: MainOptions = {}): Promise<void> {
@@ -96,7 +99,17 @@ export async function main(options: MainOptions = {}): Promise<void> {
       return;
     }
 
-    const response = await fetchQuota(parsed.providers, providerOptions);
+    const fetched = await fetchQuota(parsed.providers, providerOptions);
+    const response: QuotaAxiResponse =
+      parsed.failBelow === undefined
+        ? fetched
+        : {
+            ...fetched,
+            threshold: evaluateQuotaThreshold(
+              fetched.providers,
+              parsed.failBelow,
+            ),
+          };
     const rendered = parsed.json
       ? JSON.stringify(redactedResponse(response, parsed.full), null, 2)
       : renderQuotaToon(
@@ -108,6 +121,10 @@ export async function main(options: MainOptions = {}): Promise<void> {
 
     if (response.providers.every((provider) => isFailed(provider))) {
       process.exitCode = 1;
+    } else if (response.threshold?.status === "fail") {
+      process.exitCode = 3;
+    } else if (response.threshold?.status === "unknown") {
+      process.exitCode = 4;
     }
     writeCachedProvidersBestEffort(response.providers);
   } catch (error) {
@@ -131,6 +148,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let intervalSeconds = defaultWatchIntervalSeconds();
   let refresh = false;
   let once = false;
+  let failBelow: number | undefined;
 
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
@@ -173,6 +191,20 @@ export function parseArgs(argv: string[]): ParsedArgs {
       once = true;
       continue;
     }
+    if (arg === "--fail-below") {
+      const value = argv[index + 1];
+      if (!value) throw new Error("--fail-below requires a percentage");
+      failBelow = parsePercentage(value, "--fail-below");
+      index++;
+      continue;
+    }
+    if (arg.startsWith("--fail-below=")) {
+      failBelow = parsePercentage(
+        arg.slice("--fail-below=".length),
+        "--fail-below",
+      );
+      continue;
+    }
     if (arg === "--interval" || arg === "-i") {
       const value = argv[index + 1];
       if (!value) throw new Error("--interval requires seconds");
@@ -199,6 +231,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
     throw new Error(`unknown argument: ${arg}`);
   }
 
+  if (failBelow !== undefined && (command === "auth" || command === "watch")) {
+    throw new Error("--fail-below is only supported for quota reports");
+  }
+
   return {
     command,
     providers: parseProviders(providerValue),
@@ -208,6 +244,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     intervalSeconds,
     refresh,
     once,
+    failBelow,
   };
 }
 
@@ -288,6 +325,17 @@ function parseIntervalSeconds(value: string): number {
     throw new Error("--interval must be a positive number of seconds");
   }
   return seconds;
+}
+
+function parsePercentage(value: string, flag: string): number {
+  if (value.trim().length === 0) {
+    throw new Error(`${flag} must be a number from 0 to 100`);
+  }
+  const percentage = Number(value);
+  if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+    throw new Error(`${flag} must be a number from 0 to 100`);
+  }
+  return percentage;
 }
 
 async function fetchQuota(

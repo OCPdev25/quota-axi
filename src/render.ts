@@ -44,6 +44,25 @@ export function renderQuotaToon(
     encode({ providers }),
     encode({ windows }),
   ];
+  if (response.threshold) {
+    blocks.push(
+      encode({
+        threshold: {
+          minimumRemainingPercent: response.threshold.minimumRemainingPercent,
+          status: response.threshold.status,
+          measuredWindows: response.threshold.measuredWindows,
+        },
+      }),
+    );
+    if (response.threshold.breaches.length > 0) {
+      blocks.push(encode({ breaches: response.threshold.breaches }));
+    }
+    if (response.threshold.unknownProviders.length > 0) {
+      blocks.push(
+        encode({ unknownProviders: response.threshold.unknownProviders }),
+      );
+    }
+  }
   const advice = response.providers
     .filter((provider) => provider.state.reason && provider.state.remedyCommand)
     .map((provider) => ({
